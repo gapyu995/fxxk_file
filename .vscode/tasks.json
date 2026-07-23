@@ -1,0 +1,40 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Chanslator: 安装环境",
+      "type": "shell",
+      "command": "python",
+      "args": ["-m", "venv", ".venv"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Chanslator: 安装依赖",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "pip", "install", "-r", "requirements.txt"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "dependsOn": "Chanslator: 安装环境",
+      "problemMatcher": []
+    },
+    {
+      "label": "Chanslator: 启动 Web 工作区",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": ["tools\\run.py"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "dependsOn": "Chanslator: 安装依赖",
+      "problemMatcher": []
+    },
+    {
+      "label": "Chanslator: 启动桌面审校窗口",
+      "type": "process",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": ["tools\\desktop.py"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "dependsOn": "Chanslator: 安装依赖",
+      "problemMatcher": []
+    }
+  ]
+}

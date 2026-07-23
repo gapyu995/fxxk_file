@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+.env
+.pytest_cache/
+
+# Runtime files
+inbox/*
+!inbox/.gitkeep
+originals/*
+!originals/.gitkeep
+workspace/*
+!workspace/.gitkeep
+output/*
+!output/.gitkeep

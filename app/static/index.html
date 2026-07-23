@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Chanslator · 专业对照翻译工作区</title>
+    <link rel="stylesheet" href="/styles.css?v=20260723-5" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark">译</div>
+          <div>
+            <strong>Chanslator</strong>
+            <span>专业对照翻译工作区</span>
+          </div>
+        </div>
+        <div class="top-actions">
+          <span id="saveState" class="save-state">已保存</span>
+          <button id="settingsButton" class="button subtle" type="button"><span class="dot" id="configDot"></span>模型设置</button>
+        </div>
+      </header>
+
+      <div class="body-layout">
+        <aside class="sidebar">
+          <label id="dropzone" class="dropzone" for="fileInput">
+            <input id="fileInput" type="file" accept=".doc,.docx,.pdf" multiple hidden />
+            <span class="upload-icon">＋</span>
+            <strong>拖入待翻译文档</strong>
+            <span>DOC · DOCX · PDF</span>
+          </label>
+          <label class="auto-translate"><input id="autoTranslate" type="checkbox" checked /> 上传后立即翻译</label>
+
+          <div class="sidebar-heading">
+            <span>最近文档</span>
+            <button id="refreshList" class="icon-button" title="刷新" type="button">↻</button>
+          </div>
+          <nav id="documentList" class="document-list"></nav>
+
+          <div class="sidebar-note">
+            <strong>术语与规范</strong>
+            <p>将 CSV、TSV 或 JSON 术语表放入 <code>glossaries</code>，下一批翻译会自动应用。</p>
+          </div>
+        </aside>
+
+        <main id="main" class="main-panel">
+          <section id="emptyState" class="empty-state">
+            <div class="empty-illustration"><span>中</span><i>⇄</i><span>EN</span></div>
+            <h1>左看原文件，右改正式译文</h1>
+            <p>拖入文档后，系统会保留原件、应用专业术语并生成可编辑的正式 DOCX 译文。</p>
+            <button id="emptyUpload" class="button primary" type="button">选择文档</button>
+          </section>
+
+          <section id="reviewWorkspace" class="review-workspace hidden">
+            <div class="document-toolbar">
+              <div class="document-title-wrap">
+                <h1 id="documentTitle"></h1>
+                <div class="document-meta">
+                  <span id="statusBadge" class="status-badge">待翻译</span>
+                  <span id="segmentCount"></span>
+                  <span id="originalPath"></span>
+                </div>
+              </div>
+              <div class="toolbar-actions">
+                <select id="sourceLanguage" aria-label="源语言">
+                  <option value="zh">中文</option>
+                  <option value="en">English</option>
+                </select>
+                <span class="direction-arrow">→</span>
+                <select id="targetLanguage" aria-label="目标语言">
+                  <option value="en">English</option>
+                  <option value="zh">中文</option>
+                </select>
+                <button id="translateButton" class="button primary" type="button">翻译空白段落</button>
+                <button id="fileViewButton" class="button view-button active" type="button" title="左侧查看原始版面，右侧逐段审校">原件版面对照</button>
+                <button id="alignedViewButton" class="button view-button" type="button" title="原文与译文严格逐段并排">逐段精确对照</button>
+                <a id="openOriginalButton" class="button" target="_blank">打开原文件</a>
+                <button id="downloadTranslationButton" class="button" type="button">下载译文 DOCX</button>
+              </div>
+            </div>
+
+            <div id="progressWrap" class="progress-wrap hidden">
+              <div class="progress-track"><span id="progressBar"></span></div>
+              <span id="progressText">翻译中 0%</span>
+            </div>
+
+            <div id="reviewBody" class="review-body file-view">
+              <section id="originalPreviewPane" class="original-preview-pane">
+                <div class="pane-heading">
+                  <strong>原文件</strong>
+                  <span class="preview-tools">
+                    <label><input id="syncScroll" type="checkbox" checked /> 同步翻页</label>
+                    <b id="previewPageStatus">正在载入页码…</b>
+                  </span>
+                </div>
+                <iframe id="originalPreview" title="原文件预览"></iframe>
+              </section>
+              <section id="translationWorkPane" class="translation-work-pane" tabindex="0" aria-label="译文滚动区域">
+                <div class="pane-heading translation-pane-heading">
+                  <strong>完整译文</strong>
+                  <span id="translationCoverage" class="translation-coverage">正在统计译文段落…</span>
+                </div>
+                <div class="column-headings">
+                  <span>#</span>
+                  <strong id="sourceHeading">原文</strong>
+                  <strong id="targetHeading">译文</strong>
+                  <span></span>
+                </div>
+                <div id="segmentRows" class="segment-rows"></div>
+              </section>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <dialog id="settingsDialog" class="settings-dialog">
+      <form id="settingsForm" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <h2>翻译模型设置</h2>
+            <p>支持 CCSwitch、本地网关、OpenAI 兼容接口和 Anthropic 兼容接口。配置仅保存在本机 <code>.env</code>。</p>
+          </div>
+          <button id="closeSettings" class="icon-button" type="button">×</button>
+        </div>
+        <label>接口协议
+          <select id="apiProtocol" name="apiProtocol">
+            <option value="openai">OpenAI 兼容 / CCSwitch 网关</option>
+            <option value="anthropic">Anthropic Messages 兼容网关</option>
+          </select>
+        </label>
+        <label>网关地址或完整请求地址<input id="baseUrl" name="baseUrl" type="url" required placeholder="http://127.0.0.1:端口/v1" /></label>
+        <label>模型名称<input id="modelName" name="modelName" type="text" required placeholder="gpt-4.1-mini" /></label>
+        <div class="setting-grid">
+          <label>每次最多段落数<input id="batchSize" type="number" min="1" max="10" step="1" required /></label>
+          <label>单次最大原文字符数<input id="requestCharLimit" type="number" min="500" max="20000" step="500" required /></label>
+          <label>失败自动重试次数<input id="maxRetries" type="number" min="0" max="10" step="1" required /></label>
+        </div>
+        <label>API Key（本地无鉴权网关可留空）<input id="apiKey" name="apiKey" type="password" autocomplete="off" placeholder="已配置时留空可保留原 Key" /></label>
+        <div id="keyHint" class="key-hint"></div>
+        <label class="clear-key"><input id="clearApiKey" type="checkbox" /> 清除已经保存的 API Key</label>
+        <label class="clear-key"><input id="useSystemProxy" type="checkbox" /> 使用 Windows/环境变量中的系统代理</label>
+        <div class="dialog-actions">
+          <button id="cancelSettings" class="button" type="button">取消</button>
+          <button class="button primary" type="submit">保存设置</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="uploadOverlay" class="upload-overlay hidden">
+      <div><span>＋</span><strong>松开即可导入并翻译</strong></div>
+    </div>
+    <div id="toast" class="toast hidden"></div>
+    <script src="/vendor/pdf.min.js"></script>
+    <script src="/app.js?v=20260723-8" defer></script>
+  </body>
+</html>
