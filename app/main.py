@@ -52,7 +52,7 @@ async def lifespan(_: FastAPI):
     await asyncio.to_thread(finalize_and_clear_document_records)
 
 
-app = FastAPI(title="Chanslator", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Translator", version="1.0.0", lifespan=lifespan)
 
 
 class TranslationRequest(BaseModel):

@@ -15,6 +15,5 @@ from app.config import get_settings
 
 if __name__ == "__main__":
     settings = get_settings()
-    print(f"\nChanslator 已启动：http://{settings.host}:{settings.port}\n")
+    print(f"\nTranslator 已启动：http://{settings.host}:{settings.port}\n")
     uvicorn.run("app.main:app", host=settings.host, port=settings.port, reload=False)
-

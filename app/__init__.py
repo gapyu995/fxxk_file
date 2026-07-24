@@ -1,2 +1,1 @@
-"""Chanslator local bilingual translation workspace."""
-
+"""Translator local bilingual translation workspace."""
