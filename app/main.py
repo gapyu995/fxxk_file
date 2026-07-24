@@ -315,6 +315,7 @@ html,body{min-height:100%;margin:0;background:#dfe4e1;color:#33413a;font-family:
   let scrollFrame=0;
   let applyingSync=false;
   let releaseTimer=0;
+  let previewZoom=1;
 
   function refreshPages(){
     pageElements=[...document.querySelectorAll('#preview section.docx')];
@@ -366,7 +367,21 @@ html,body{min-height:100%;margin:0;background:#dfe4e1;color:#33413a;font-family:
   });
   window.addEventListener('message',event=>{
     const message=event.data;
-    if(event.source!==parent||!message||message.type!=='chanslator-sync-scroll')return;
+    if(event.source!==parent||!message)return;
+    if(message.type==='chanslator-preview-zoom'){
+      const maxScrollBefore=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);
+      const ratio=maxScrollBefore?window.scrollY/maxScrollBefore:0;
+      previewZoom=Math.max(.6,Math.min(2,Number(message.zoom)||1));
+      document.getElementById('preview').style.zoom=String(previewZoom);
+      requestAnimationFrame(()=>{
+        refreshPages();
+        const maxScroll=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);
+        window.scrollTo(0,ratio*maxScroll);
+        postPosition('ready');
+      });
+      return;
+    }
+    if(message.type!=='chanslator-sync-scroll')return;
     const ratio=Math.max(0,Math.min(1,Number(message.ratio)||0));
     const maxScroll=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);
     applyingSync=true;
@@ -411,12 +426,12 @@ def _pdf_preview_page(document_id: str) -> str:
 <script src="/vendor/pdf.min.js"></script>
 <style>
 html,body{min-height:100%;margin:0;background:#dfe4e1;color:#33413a;font-family:system-ui,'Microsoft YaHei',sans-serif}
-body{overflow-y:scroll}
+body{overflow:auto}
 #loading{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:#eef1ef}
 #loading .box{max-width:520px;padding:24px 30px;border-radius:10px;background:white;box-shadow:0 8px 30px #26352d18;text-align:center}
 #loading strong{display:block;margin-bottom:7px;color:#213029}
 #loading span{font-size:12px;color:#718078;line-height:1.7}
-#pages{display:flex;flex-direction:column;align-items:center;gap:18px;padding:20px 14px 40px;box-sizing:border-box}
+#pages{display:flex;flex-direction:column;align-items:center;gap:18px;width:max-content;min-width:100%;padding:20px 14px 40px;box-sizing:border-box}
 .pdf-page{position:relative;width:min(calc(100vw - 28px),900px);aspect-ratio:var(--page-ratio,612 / 792);overflow:hidden;background:white;box-shadow:0 3px 18px #26352d30}
 .pdf-page canvas{display:block;width:100%;height:100%;background:white}
 .page-placeholder{position:absolute;inset:0;display:grid;place-items:center;color:#93a09a;background:linear-gradient(135deg,#fff,#f7f9f8);font-size:12px}
@@ -440,6 +455,7 @@ body{overflow-y:scroll}
   let scrollFrame=0;
   let applyingSync=false;
   let releaseTimer=0;
+  let previewZoom=1;
 
   function placeholder(pageNumber,text){
     const node=document.createElement('span');
@@ -464,6 +480,11 @@ body{overflow-y:scroll}
     if(page)return Number(page.dataset.pageNumber)||1;
     const ratio=window.scrollY/Math.max(1,document.documentElement.scrollHeight-window.innerHeight);
     return Math.max(1,Math.min(pdfDocument?pdfDocument.numPages:1,Math.round(ratio*((pdfDocument?pdfDocument.numPages:1)-1))+1));
+  }
+
+  function applyPreviewZoom(){
+    const pageWidth=Math.max(240,Math.min(window.innerWidth-28,900)*previewZoom);
+    for(const element of pageElements)element.style.width=pageWidth+'px';
   }
 
   function postPosition(kind){
@@ -553,13 +574,29 @@ body{overflow-y:scroll}
 
   window.addEventListener('scroll',onScroll,{passive:true});
   window.addEventListener('resize',()=>{
+    applyPreviewZoom();
     for(const pageNumber of [...rendered])releasePage(pageNumber);
     for(const pageNumber of nearby)enqueueRender(pageNumber);
     postPosition('ready');
   });
   window.addEventListener('message',event=>{
     const message=event.data;
-    if(event.source!==parent||!message||message.type!=='chanslator-sync-scroll')return;
+    if(event.source!==parent||!message)return;
+    if(message.type==='chanslator-preview-zoom'){
+      const maxScrollBefore=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);
+      const ratio=maxScrollBefore?window.scrollY/maxScrollBefore:0;
+      previewZoom=Math.max(.6,Math.min(2,Number(message.zoom)||1));
+      applyPreviewZoom();
+      for(const pageNumber of [...rendered])releasePage(pageNumber);
+      for(const pageNumber of nearby)enqueueRender(pageNumber);
+      requestAnimationFrame(()=>{
+        const maxScroll=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);
+        window.scrollTo(0,ratio*maxScroll);
+        postPosition('ready');
+      });
+      return;
+    }
+    if(message.type!=='chanslator-sync-scroll')return;
     const ratio=Math.max(0,Math.min(1,Number(message.ratio)||0));
     const maxScroll=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);
     applyingSync=true;
@@ -593,6 +630,7 @@ body{overflow-y:scroll}
       fragment.append(element);
     }
     container.append(fragment);
+    applyPreviewZoom();
     observer=new IntersectionObserver(entries=>{
       for(const entry of entries){
         const pageNumber=Number(entry.target.dataset.pageNumber);
@@ -628,9 +666,13 @@ async def update_segment(document_id: str, segment_id: str, body: SegmentUpdate)
         raise HTTPException(404, "段落不存在。")
     if body.source is not None:
         segment["source"] = body.source.strip()
+    translation_changed = False
     if body.translation is not None:
-        segment["translation"] = body.translation.strip()
-        segment["status"] = "edited" if segment["translation"] else "empty"
+        translation = body.translation.strip()
+        translation_changed = translation != segment.get("translation", "")
+        segment["translation"] = translation
+        if translation_changed:
+            segment["status"] = "edited" if translation else "empty"
     if body.locked is not None:
         segment["locked"] = body.locked
     if body.reviewed is not None:
@@ -638,7 +680,7 @@ async def update_segment(document_id: str, segment_id: str, body: SegmentUpdate)
         segment["locked"] = body.reviewed
     _refresh_progress(document)
     save_document(document)
-    if body.translation is not None:
+    if translation_changed:
         await asyncio.to_thread(create_translated_docx, document)
     return segment
 

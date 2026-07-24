@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
     <title>Chanslator · 专业对照翻译工作区</title>
-    <link rel="stylesheet" href="/styles.css?v=20260723-5" />
+    <link rel="stylesheet" href="/styles.css?v=20260723-7" />
   </head>
   <body>
     <div class="app-shell">
@@ -91,16 +91,31 @@
                 <div class="pane-heading">
                   <strong>原文件</strong>
                   <span class="preview-tools">
+                    <span class="preview-zoom" role="group" aria-label="原文缩放">
+                      <button id="previewZoomOut" type="button" title="缩小原文">−</button>
+                      <button id="previewZoomReset" type="button" title="恢复原文默认大小"><b id="previewZoomValue">100%</b></button>
+                      <button id="previewZoomIn" type="button" title="放大原文">＋</button>
+                    </span>
                     <label><input id="syncScroll" type="checkbox" checked /> 同步翻页</label>
                     <b id="previewPageStatus">正在载入页码…</b>
                   </span>
                 </div>
                 <iframe id="originalPreview" title="原文件预览"></iframe>
               </section>
+              <div id="workspaceSplitter" class="workspace-splitter" role="separator" tabindex="0"
+                   aria-label="调整原文与译文区域宽度" aria-orientation="vertical" aria-valuemin="30"
+                   aria-valuemax="70" aria-valuenow="50" title="拖动调整左右宽度，双击恢复均分"></div>
               <section id="translationWorkPane" class="translation-work-pane" tabindex="0" aria-label="译文滚动区域">
                 <div class="pane-heading translation-pane-heading">
                   <strong>完整译文</strong>
-                  <span id="translationCoverage" class="translation-coverage">正在统计译文段落…</span>
+                  <span class="translation-heading-tools">
+                    <span id="translationCoverage" class="translation-coverage">正在统计译文段落…</span>
+                    <span class="text-size-controls" role="group" aria-label="译文字号">
+                      <button id="translationFontDown" type="button" title="减小译文字号">A−</button>
+                      <button id="translationFontReset" type="button" title="恢复默认译文字号"><b id="translationFontValue">16</b></button>
+                      <button id="translationFontUp" type="button" title="增大译文字号">A＋</button>
+                    </span>
+                  </span>
                 </div>
                 <div class="column-headings">
                   <span>#</span>
@@ -154,6 +169,6 @@
     </div>
     <div id="toast" class="toast hidden"></div>
     <script src="/vendor/pdf.min.js"></script>
-    <script src="/app.js?v=20260723-8" defer></script>
+    <script src="/app.js?v=20260723-10" defer></script>
   </body>
 </html>

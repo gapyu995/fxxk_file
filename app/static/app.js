@@ -3,13 +3,21 @@ const state = {
   settings: null,
   pollTimer: null,
   saveTimers: new Map(),
+  saveInFlight: new Map(),
+  dirtyTranslations: new Map(),
   toastTimer: null,
   dragDepth: 0,
   viewMode: "file",
   sourceProgressIndex: null,
   segmentPageMap: null,
   segmentPageMapTask: null,
+  selectionVersion: 0,
+  previewZoom: 1,
+  translationFontSize: 16,
+  sourcePanePercent: 50,
 };
+
+const DISPLAY_PREFERENCES_KEY = "chanslator-display-preferences-v1";
 
 const $ = (selector) => document.querySelector(selector);
 const elements = {
@@ -53,6 +61,15 @@ const elements = {
   translationWorkPane: $("#translationWorkPane"),
   syncScroll: $("#syncScroll"),
   previewPageStatus: $("#previewPageStatus"),
+  previewZoomOut: $("#previewZoomOut"),
+  previewZoomReset: $("#previewZoomReset"),
+  previewZoomIn: $("#previewZoomIn"),
+  previewZoomValue: $("#previewZoomValue"),
+  translationFontDown: $("#translationFontDown"),
+  translationFontReset: $("#translationFontReset"),
+  translationFontUp: $("#translationFontUp"),
+  translationFontValue: $("#translationFontValue"),
+  workspaceSplitter: $("#workspaceSplitter"),
   fileViewButton: $("#fileViewButton"),
   alignedViewButton: $("#alignedViewButton"),
   openOriginalButton: $("#openOriginalButton"),
@@ -64,6 +81,7 @@ const elements = {
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
+  restoreDisplayPreferences();
   bindEvents();
   try {
     const [settings] = await Promise.all([loadSettings(), loadDocumentList()]);
@@ -96,8 +114,19 @@ function bindEvents() {
   elements.syncScroll.addEventListener("change", () => {
     if (elements.syncScroll.checked) syncTranslationToPreview();
   });
+  elements.previewZoomOut.addEventListener("click", () => setPreviewZoom(state.previewZoom - 0.1));
+  elements.previewZoomIn.addEventListener("click", () => setPreviewZoom(state.previewZoom + 0.1));
+  elements.previewZoomReset.addEventListener("click", () => setPreviewZoom(1));
+  elements.translationFontDown.addEventListener("click", () => setTranslationFontSize(state.translationFontSize - 1));
+  elements.translationFontUp.addEventListener("click", () => setTranslationFontSize(state.translationFontSize + 1));
+  elements.translationFontReset.addEventListener("click", () => setTranslationFontSize(16));
+  bindWorkspaceSplitter();
   window.addEventListener("message", handlePreviewMessage);
-  window.addEventListener("resize", scheduleTranslationLayout);
+  elements.originalPreview.addEventListener("load", () => setPreviewZoom(state.previewZoom, true));
+  window.addEventListener("resize", () => {
+    fitSourcePaneToViewport();
+    scheduleTranslationLayout();
+  });
 
   for (const target of [document.body, elements.dropzone]) {
     target.addEventListener("dragover", (event) => {
@@ -125,6 +154,125 @@ function bindEvents() {
     uploadFiles([...event.dataTransfer.files]);
   });
   window.addEventListener("beforeunload", saveBeforeClose);
+}
+
+function setPreviewZoom(value, force = false) {
+  const zoom = Math.max(0.6, Math.min(2, Math.round(value * 10) / 10));
+  if (!force && zoom === state.previewZoom) return;
+  state.previewZoom = zoom;
+  elements.previewZoomValue.textContent = `${Math.round(zoom * 100)}%`;
+  elements.previewZoomOut.disabled = zoom <= 0.6;
+  elements.previewZoomIn.disabled = zoom >= 2;
+  elements.originalPreview.contentWindow?.postMessage({
+    type: "chanslator-preview-zoom",
+    zoom,
+  }, "*");
+  if (!force) saveDisplayPreferences();
+}
+
+function setTranslationFontSize(value, persist = true) {
+  const size = Math.max(14, Math.min(22, Math.round(Number(value) || 16)));
+  state.translationFontSize = size;
+  document.documentElement.style.setProperty("--translation-font-size", `${size}px`);
+  elements.translationFontValue.textContent = String(size);
+  elements.translationFontDown.disabled = size <= 14;
+  elements.translationFontUp.disabled = size >= 22;
+  elements.segmentRows.querySelectorAll("textarea").forEach(autoGrow);
+  scheduleTranslationLayout();
+  if (persist) saveDisplayPreferences();
+}
+
+function setSourcePanePercent(value, persist = true) {
+  const percent = Math.max(30, Math.min(70, Math.round(Number(value) * 10) / 10));
+  state.sourcePanePercent = percent;
+  document.documentElement.style.setProperty("--source-pane-width", `${percent}%`);
+  elements.workspaceSplitter.setAttribute("aria-valuenow", String(Math.round(percent)));
+  scheduleTranslationLayout();
+  if (persist) saveDisplayPreferences();
+}
+
+function bindWorkspaceSplitter() {
+  let dragging = false;
+
+  const resizeFromPointer = (clientX, persist = false) => {
+    const bounds = elements.reviewBody.getBoundingClientRect();
+    if (!bounds.width) return;
+    const compact = window.matchMedia("(max-width: 980px)").matches;
+    const sourceMinimum = compact ? 280 : 320;
+    const translationMinimum = compact ? 340 : 360;
+    const minPercent = Math.max(30, sourceMinimum / bounds.width * 100);
+    const maxPercent = Math.min(70, (bounds.width - translationMinimum - 7) / bounds.width * 100);
+    const next = Math.max(minPercent, Math.min(maxPercent, (clientX - bounds.left) / bounds.width * 100));
+    setSourcePanePercent(next, persist);
+  };
+
+  elements.workspaceSplitter.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || state.viewMode !== "file") return;
+    dragging = true;
+    elements.workspaceSplitter.setPointerCapture(event.pointerId);
+    document.body.classList.add("resizing-workspace");
+    resizeFromPointer(event.clientX);
+  });
+  elements.workspaceSplitter.addEventListener("pointermove", (event) => {
+    if (dragging) resizeFromPointer(event.clientX);
+  });
+  elements.workspaceSplitter.addEventListener("pointerup", (event) => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.classList.remove("resizing-workspace");
+    if (elements.workspaceSplitter.hasPointerCapture(event.pointerId)) {
+      elements.workspaceSplitter.releasePointerCapture(event.pointerId);
+    }
+    resizeFromPointer(event.clientX, true);
+  });
+  elements.workspaceSplitter.addEventListener("pointercancel", () => {
+    dragging = false;
+    document.body.classList.remove("resizing-workspace");
+  });
+  elements.workspaceSplitter.addEventListener("dblclick", () => setSourcePanePercent(50));
+  elements.workspaceSplitter.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const direction = event.key === "ArrowLeft" ? -1 : 1;
+    setSourcePanePercent(state.sourcePanePercent + direction * (event.shiftKey ? 5 : 2));
+  });
+}
+
+function fitSourcePaneToViewport() {
+  if (state.viewMode !== "file") return;
+  const width = elements.reviewBody.getBoundingClientRect().width;
+  if (!width) return;
+  const compact = window.matchMedia("(max-width: 980px)").matches;
+  const sourceMinimum = compact ? 280 : 320;
+  const translationMinimum = compact ? 340 : 360;
+  const minimum = Math.max(30, sourceMinimum / width * 100);
+  const maximum = Math.min(70, (width - translationMinimum - 7) / width * 100);
+  if (maximum >= minimum) setSourcePanePercent(Math.max(minimum, Math.min(maximum, state.sourcePanePercent)), false);
+}
+
+function restoreDisplayPreferences() {
+  let preferences = {};
+  try {
+    preferences = JSON.parse(localStorage.getItem(DISPLAY_PREFERENCES_KEY) || "{}");
+  } catch (_) {}
+  state.previewZoom = Math.max(0.6, Math.min(2, Number(preferences.previewZoom) || 1));
+  state.viewMode = preferences.viewMode === "aligned" ? "aligned" : "file";
+  setTranslationFontSize(preferences.translationFontSize || 16, false);
+  setSourcePanePercent(preferences.sourcePanePercent || 50, false);
+  elements.previewZoomValue.textContent = `${Math.round(state.previewZoom * 100)}%`;
+  elements.previewZoomOut.disabled = state.previewZoom <= 0.6;
+  elements.previewZoomIn.disabled = state.previewZoom >= 2;
+}
+
+function saveDisplayPreferences() {
+  try {
+    localStorage.setItem(DISPLAY_PREFERENCES_KEY, JSON.stringify({
+      previewZoom: state.previewZoom,
+      translationFontSize: state.translationFontSize,
+      sourcePanePercent: state.sourcePanePercent,
+      viewMode: state.viewMode,
+    }));
+  } catch (_) {}
 }
 
 function hasFiles(event) {
@@ -211,6 +359,16 @@ async function uploadFiles(files) {
     showToast("请选择 DOC、DOCX 或 PDF 文件。", true);
     return;
   }
+  state.selectionVersion += 1;
+  if (state.current) {
+    try {
+      await flushCurrentDocument();
+    } catch (error) {
+      elements.saveState.textContent = "保存失败";
+      showToast(`当前文档保存失败，已停止导入：${error.message}`, true);
+      return;
+    }
+  }
   for (const file of supported) {
     const form = new FormData();
     form.append("file", file);
@@ -280,17 +438,12 @@ async function deleteDocumentRecord(documentData) {
   if (!confirmed) return;
   try {
     if (state.current?.id === documentData.id) {
-      for (const timer of state.saveTimers.values()) clearTimeout(timer);
-      state.saveTimers.clear();
-      await api(`/api/documents/${documentData.id}/autosave`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ translations: visibleTranslations() }),
-      });
+      await flushCurrentDocument();
     }
     await api(`/api/documents/${documentData.id}`, { method: "DELETE" });
     if (state.current?.id === documentData.id) {
       stopPoll();
+      state.selectionVersion += 1;
       state.current = null;
       elements.originalPreview.src = "about:blank";
       elements.reviewWorkspace.classList.add("hidden");
@@ -305,14 +458,79 @@ async function deleteDocumentRecord(documentData) {
 }
 
 async function selectDocument(id) {
+  if (state.current?.id === id) return;
+  const selectionVersion = ++state.selectionVersion;
   try {
+    if (state.current?.id && state.current.id !== id) await flushCurrentDocument();
     const documentData = await api(`/api/documents/${id}`);
+    if (selectionVersion !== state.selectionVersion) return;
     setCurrentDocument(documentData, true);
     await loadDocumentList();
     if (documentData.status === "translating") schedulePoll();
   } catch (error) {
     showToast(error.message, true);
   }
+}
+
+function segmentSaveKey(documentId, segmentId) {
+  return `${documentId}:${segmentId}`;
+}
+
+function dirtyTranslationsForDocument(documentId) {
+  const prefix = `${documentId}:`;
+  const translations = {};
+  for (const [key, value] of state.dirtyTranslations) {
+    if (!key.startsWith(prefix)) continue;
+    translations[key.slice(prefix.length)] = value;
+  }
+  return translations;
+}
+
+function clearSavedDirtyTranslations(documentId, translations) {
+  for (const [segmentId, value] of Object.entries(translations)) {
+    const key = segmentSaveKey(documentId, segmentId);
+    if (state.dirtyTranslations.get(key) === value) state.dirtyTranslations.delete(key);
+  }
+}
+
+function hasPendingSegmentSave(documentId, segmentId) {
+  return state.saveTimers.has(segmentSaveKey(documentId, segmentId));
+}
+
+function hasPendingDocumentSaves(documentId) {
+  const prefix = `${documentId}:`;
+  return [...state.saveTimers.keys(), ...state.saveInFlight.keys()].some((key) => key.startsWith(prefix));
+}
+
+function clearDocumentSaveTimers(documentId) {
+  const prefix = `${documentId}:`;
+  for (const [key, record] of state.saveTimers) {
+    if (!key.startsWith(prefix)) continue;
+    clearTimeout(record.timer);
+    state.saveTimers.delete(key);
+  }
+}
+
+async function flushCurrentDocument() {
+  if (!state.current) return;
+  const documentId = state.current.id;
+  elements.saveState.textContent = "保存中…";
+  clearDocumentSaveTimers(documentId);
+  const prefix = `${documentId}:`;
+  const inFlight = [...state.saveInFlight.entries()]
+    .filter(([key]) => key.startsWith(prefix))
+    .map(([, request]) => request);
+  if (inFlight.length) await Promise.allSettled(inFlight);
+  const translations = dirtyTranslationsForDocument(documentId);
+  if (Object.keys(translations).length) {
+    await api(`/api/documents/${documentId}/autosave`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ translations }),
+    });
+    clearSavedDirtyTranslations(documentId, translations);
+  }
+  if (state.current?.id === documentId) elements.saveState.textContent = "已保存";
 }
 
 function setCurrentDocument(documentData, fullRender = false) {
@@ -322,6 +540,7 @@ function setCurrentDocument(documentData, fullRender = false) {
   history.replaceState(null, "", `#/${documentData.id}`);
   elements.emptyState.classList.add("hidden");
   elements.reviewWorkspace.classList.remove("hidden");
+  requestAnimationFrame(fitSourcePaneToViewport);
   updateDocumentMeta(documentData);
   if (!previous || previous.id !== documentData.id) {
     state.segmentPageMap = null;
@@ -329,7 +548,7 @@ function setCurrentDocument(documentData, fullRender = false) {
     elements.previewPageStatus.textContent = "正在载入页码…";
     elements.originalPreview.src = `/api/documents/${documentData.id}/preview`;
     elements.openOriginalButton.href = `/api/documents/${documentData.id}/original`;
-    setViewMode("file");
+    setViewMode(state.viewMode, false);
   }
 
   const mustRender = fullRender || !previous || previous.id !== documentData.id || previous.segments.length !== documentData.segments.length;
@@ -386,7 +605,7 @@ function renderRows(segments) {
   scheduleTranslationLayout();
 }
 
-function setViewMode(mode) {
+function setViewMode(mode, persist = true) {
   state.viewMode = mode;
   const aligned = mode === "aligned";
   elements.reviewBody.classList.toggle("file-view", !aligned);
@@ -394,7 +613,11 @@ function setViewMode(mode) {
   elements.fileViewButton.classList.toggle("active", !aligned);
   elements.alignedViewButton.classList.toggle("active", aligned);
   scheduleTranslationLayout();
-  if (!aligned && elements.syncScroll.checked) requestAnimationFrame(syncTranslationToPreview);
+  if (!aligned) {
+    requestAnimationFrame(fitSourcePaneToViewport);
+    if (elements.syncScroll.checked) requestAnimationFrame(syncTranslationToPreview);
+  }
+  if (persist) saveDisplayPreferences();
 }
 
 let translationLayoutFrame = 0;
@@ -878,17 +1101,13 @@ async function downloadTranslation() {
 }
 
 function saveBeforeClose() {
-  if (!state.current) return;
-  const payload = new Blob([JSON.stringify({ translations: visibleTranslations() })], { type: "application/json" });
-  navigator.sendBeacon(`/api/documents/${state.current.id}/autosave`, payload);
-}
-
-function visibleTranslations() {
-  const translations = {};
-  for (const row of elements.segmentRows.querySelectorAll(".segment-row")) {
-    translations[row.dataset.segmentId] = row.querySelector("textarea")?.value || "";
+  const documentIds = new Set([...state.dirtyTranslations.keys()].map((key) => key.split(":", 1)[0]));
+  for (const documentId of documentIds) {
+    const translations = dirtyTranslationsForDocument(documentId);
+    if (!Object.keys(translations).length) continue;
+    const payload = new Blob([JSON.stringify({ translations })], { type: "application/json" });
+    navigator.sendBeacon(`/api/documents/${documentId}/autosave`, payload);
   }
-  return translations;
 }
 
 function makeRow(segment, index) {
@@ -948,15 +1167,35 @@ function makeRow(segment, index) {
   lock.dataset.action = "lock";
   lock.classList.toggle("locked", segment.locked);
   lock.addEventListener("click", () => toggleLock(segment.id, !lock.classList.contains("locked")));
-  const review = actionButton("✓", "标记为已审校");
+  const review = actionButton("✓", "标记为已审校（Ctrl+Enter）");
   review.dataset.action = "review";
   review.classList.toggle("reviewed", segment.status === "reviewed");
   review.addEventListener("click", () => toggleReviewed(segment.id, !review.classList.contains("reviewed")));
+  textarea.setAttribute("aria-keyshortcuts", "Alt+ArrowUp Alt+ArrowDown Control+Enter");
+  textarea.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      review.click();
+      return;
+    }
+    if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
+    event.preventDefault();
+    focusAdjacentTranslation(row, event.key === "ArrowUp" ? -1 : 1);
+  });
   actions.append(sourceToggle, translate, lock, review);
 
   row.append(number, source, target, actions);
   requestAnimationFrame(() => autoGrow(textarea));
   return row;
+}
+
+function focusAdjacentTranslation(row, direction) {
+  const rows = [...elements.segmentRows.querySelectorAll(".segment-row")];
+  const next = rows[rows.indexOf(row) + direction];
+  const textarea = next?.querySelector("textarea");
+  if (!textarea) return;
+  textarea.focus({ preventScroll: true });
+  next.scrollIntoView({ block: "center", behavior: "smooth" });
 }
 
 function actionButton(text, title) {
@@ -973,7 +1212,7 @@ function mergeRows(segments) {
     const row = elements.segmentRows.querySelector(`[data-segment-id="${segment.id}"]`);
     if (!row) continue;
     const textarea = row.querySelector("textarea");
-    if (document.activeElement !== textarea && !state.saveTimers.has(segment.id) && textarea.value !== (segment.translation || "")) {
+    if (document.activeElement !== textarea && !hasPendingSegmentSave(state.current.id, segment.id) && textarea.value !== (segment.translation || "")) {
       textarea.value = segment.translation || "";
       autoGrow(textarea);
     }
@@ -993,51 +1232,95 @@ function mergeRows(segments) {
 }
 
 function queueSegmentSave(segmentId, body) {
-  clearTimeout(state.saveTimers.get(segmentId));
+  const documentId = state.current?.id;
+  if (!documentId) return;
+  const key = segmentSaveKey(documentId, segmentId);
+  if (Object.hasOwn(body, "translation")) state.dirtyTranslations.set(key, body.translation);
+  const previous = state.saveTimers.get(key);
+  if (previous) clearTimeout(previous.timer);
   elements.saveState.textContent = "有未保存更改";
-  const timer = setTimeout(async () => {
-    elements.saveState.textContent = "保存中…";
+  const token = Symbol(key);
+  const record = { timer: null, token };
+  record.timer = setTimeout(async () => {
+    let succeeded = false;
+    if (state.current?.id === documentId) elements.saveState.textContent = "保存中…";
+    const previousRequest = state.saveInFlight.get(key) || Promise.resolve();
+    const request = previousRequest.catch(() => {}).then(() => api(`/api/documents/${documentId}/segments/${segmentId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }));
+    state.saveInFlight.set(key, request);
     try {
-      const updated = await api(`/api/documents/${state.current.id}/segments/${segmentId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const local = state.current.segments.find((item) => item.id === segmentId);
-      if (local) Object.assign(local, updated);
-      const row = elements.segmentRows.querySelector(`[data-segment-id="${segmentId}"]`);
-      if (row) row.querySelector(".segment-state").textContent = segmentStatusName(updated.status);
-      elements.saveState.textContent = "已保存";
+      const updated = await request;
+      if (state.current?.id === documentId) {
+        const local = state.current.segments.find((item) => item.id === segmentId);
+        if (local) Object.assign(local, updated);
+        const row = elements.segmentRows.querySelector(`[data-segment-id="${segmentId}"]`);
+        if (row) row.querySelector(".segment-state").textContent = segmentStatusName(updated.status);
+      }
+      if (Object.hasOwn(body, "translation") && state.dirtyTranslations.get(key) === body.translation) {
+        state.dirtyTranslations.delete(key);
+      }
+      succeeded = true;
     } catch (error) {
-      elements.saveState.textContent = "保存失败";
+      if (state.current?.id === documentId) elements.saveState.textContent = "保存失败";
       showToast(error.message, true);
     } finally {
-      state.saveTimers.delete(segmentId);
+      if (state.saveTimers.get(key)?.token === token) state.saveTimers.delete(key);
+      if (state.saveInFlight.get(key) === request) state.saveInFlight.delete(key);
+      if (succeeded && state.current?.id === documentId && !hasPendingDocumentSaves(documentId)) {
+        elements.saveState.textContent = "已保存";
+      }
     }
   }, 650);
-  state.saveTimers.set(segmentId, timer);
+  state.saveTimers.set(key, record);
 }
 
 async function toggleLock(segmentId, locked) {
+  const documentId = state.current?.id;
+  if (!documentId) return;
+  const button = elements.segmentRows.querySelector(`[data-segment-id="${segmentId}"] [data-action="lock"]`);
+  if (button) button.disabled = true;
   try {
-    const updated = await patchSegment(segmentId, { locked });
-    updateLocalSegment(updated);
+    const updated = await patchSegment(documentId, segmentId, { locked });
+    if (state.current?.id === documentId) updateLocalSegment(updated);
   } catch (error) {
     showToast(error.message, true);
+  } finally {
+    if (button?.isConnected) button.disabled = false;
   }
 }
 
 async function toggleReviewed(segmentId, reviewed) {
+  const documentId = state.current?.id;
+  if (!documentId) return;
+  const row = elements.segmentRows.querySelector(`[data-segment-id="${segmentId}"]`);
+  const button = row?.querySelector('[data-action="review"]');
+  if (button) button.disabled = true;
+  const translation = row?.querySelector("textarea")?.value || "";
   try {
-    const updated = await patchSegment(segmentId, { reviewed });
-    updateLocalSegment(updated);
+    const key = segmentSaveKey(documentId, segmentId);
+    const pending = state.saveTimers.get(key);
+    if (pending) clearTimeout(pending.timer);
+    state.saveTimers.delete(key);
+    const inFlight = state.saveInFlight.get(key);
+    if (inFlight) await inFlight.catch(() => {});
+    const updated = await patchSegment(documentId, segmentId, { translation, reviewed });
+    if (state.dirtyTranslations.get(key) === translation) state.dirtyTranslations.delete(key);
+    if (state.current?.id === documentId) {
+      updateLocalSegment(updated);
+      if (!hasPendingDocumentSaves(documentId)) elements.saveState.textContent = "已保存";
+    }
   } catch (error) {
     showToast(error.message, true);
+  } finally {
+    if (button?.isConnected) button.disabled = false;
   }
 }
 
-async function patchSegment(segmentId, body) {
-  return api(`/api/documents/${state.current.id}/segments/${segmentId}`, {
+async function patchSegment(documentId, segmentId, body) {
+  return api(`/api/documents/${documentId}/segments/${segmentId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -1051,12 +1334,14 @@ function updateLocalSegment(segment) {
 }
 
 async function translateSegment(segmentId, button) {
+  const documentId = state.current?.id;
+  if (!documentId) return;
   button.disabled = true;
   button.classList.add("busy");
   try {
-    const updated = await api(`/api/documents/${state.current.id}/segments/${segmentId}/translate`, { method: "POST" });
-    updateLocalSegment(updated);
-    showToast("本段已重新翻译。", false);
+    const updated = await api(`/api/documents/${documentId}/segments/${segmentId}/translate`, { method: "POST" });
+    if (state.current?.id === documentId) updateLocalSegment(updated);
+    if (state.current?.id === documentId) showToast("本段已重新翻译。", false);
   } catch (error) {
     showToast(error.message, true);
   } finally {
@@ -1067,6 +1352,7 @@ async function translateSegment(segmentId, button) {
 
 async function startTranslation(overwrite) {
   if (!state.current) return;
+  const documentId = state.current.id;
   if (!state.settings?.configured) {
     showToast("请先配置翻译模型。", true);
     await openSettings();
@@ -1080,18 +1366,20 @@ async function startTranslation(overwrite) {
   }
   elements.translateButton.disabled = true;
   try {
-    await api(`/api/documents/${state.current.id}/translate`, {
+    await api(`/api/documents/${documentId}/translate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source_language: source, target_language: target, overwrite }),
     });
-    state.current.status = "translating";
-    state.current.source_language = source;
-    state.current.target_language = target;
-    updateDocumentMeta(state.current);
-    schedulePoll();
+    if (state.current?.id === documentId) {
+      state.current.status = "translating";
+      state.current.source_language = source;
+      state.current.target_language = target;
+      updateDocumentMeta(state.current);
+      schedulePoll();
+    }
   } catch (error) {
-    elements.translateButton.disabled = false;
+    if (state.current?.id === documentId) elements.translateButton.disabled = false;
     showToast(error.message, true);
   }
 }
