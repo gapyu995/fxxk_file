@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
-    <title>Translator · 专业对照翻译工作区</title>
-    <link rel="stylesheet" href="/styles.css?v=20260723-7" />
+    <title>LinguaBridge · 多功能文档工作台</title>
+    <link rel="stylesheet" href="/styles.css?v=20260819-3" />
   </head>
   <body>
     <div class="app-shell">
@@ -13,11 +13,12 @@
         <div class="brand">
           <div class="brand-mark">译</div>
           <div>
-            <strong>Translator</strong>
-            <span>专业对照翻译工作区</span>
+            <strong>LinguaBridge Workbench</strong>
+            <span>多功能文档工作台</span>
           </div>
         </div>
         <div class="top-actions">
+          <div class="function-menu" id="functionMenu"><span class="function-icon">✦</span><span class="function-label">功能</span><button id="functionTrigger" class="function-trigger" type="button">文档翻译 <span>⌄</span></button><div id="functionOptions" class="function-options"><button type="button" data-value="translate">文档翻译</button><button type="button" data-value="compare">双文件对比</button></div><select id="functionSelect" hidden><option value="translate">文档翻译</option><option value="compare">双文件对比</option></select></div>
           <span id="saveState" class="save-state">已保存</span>
           <button id="settingsButton" class="button subtle" type="button"><span class="dot" id="configDot"></span>模型设置</button>
         </div>
@@ -164,11 +165,23 @@
       </form>
     </dialog>
 
+    <dialog id="compareDialog" class="compare-dialog">
+      <form method="dialog" class="compare-form">
+        <div class="dialog-heading"><div><h2>打开两份文件进行比对</h2><p>支持 Word、PDF 和照片；文档按页数同步，照片共享缩放。</p></div><button id="closeCompare" class="icon-button" type="button">×</button></div>
+        <div class="compare-pickers"><label class="compare-file-picker">选择文件<input id="compareFilesInput" type="file" accept=".doc,.docx,.pdf,image/*" multiple required /><span>一次选择两份文件；超过两份时只使用前两份</span></label></div><div id="compareUploadProgress" class="compare-upload-progress hidden"><div class="compare-progress-head"><span id="compareUploadStatus">正在准备文件…</span><b id="compareUploadPercent">0%</b></div><div class="compare-progress-track"><i id="compareUploadBar"></i></div></div><p class="compare-hint">请使用同一类型：文档 + 文档，或图片 + 图片。</p>
+        <div class="dialog-actions"><button id="cancelCompare" class="button" type="button">取消</button><button id="startCompare" class="button primary" type="submit">开始对比</button></div>
+      </form>
+    </dialog>
+    <section id="compareWorkspace" class="compare-workspace hidden">
+      <div class="compare-toolbar"><strong>双文件对比</strong><span id="compareStatus">请选择两份文件</span><span class="compare-toolbar-actions"><label><input id="compareSync" type="checkbox" checked /> 同步滚动</label><span class="preview-zoom"><button id="compareZoomOut" type="button">−</button><button id="compareZoomReset" type="button"><b id="compareZoomValue">100%</b></button><button id="compareZoomIn" type="button">＋</button></span><button id="closeCompareWorkspace" class="button" type="button">返回翻译工作区</button></span></div>
+      <div class="compare-panels"><div class="compare-panel"><div id="compareLeftTitle" class="compare-panel-title"></div><div id="compareLeft" class="compare-canvas"></div></div><div class="compare-divider"></div><div class="compare-panel"><div id="compareRightTitle" class="compare-panel-title"></div><div id="compareRight" class="compare-canvas"></div></div></div>
+    </section>
+
     <div id="uploadOverlay" class="upload-overlay hidden">
       <div><span>＋</span><strong>松开即可导入并翻译</strong></div>
     </div>
     <div id="toast" class="toast hidden"></div>
     <script src="/vendor/pdf.min.js"></script>
-    <script src="/app.js?v=20260723-10" defer></script>
+    <script src="/app.js?v=20260819-2" defer></script>
   </body>
 </html>

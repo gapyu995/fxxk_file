@@ -15,11 +15,11 @@ echo Installing required components. Please wait...
 if errorlevel 1 goto error
 
 :launch
-start "Translator" /D "%CD%" ".venv\Scripts\pythonw.exe" "tools\desktop.py"
+start "LinguaBridge" /D "%CD%" ".venv\Scripts\pythonw.exe" "tools\desktop.py"
 exit /b 0
 
 :error
 echo.
-echo Translator could not start. Check Python and the network connection.
+echo LinguaBridge could not start. Check Python and the network connection.
 pause
 exit /b 1

@@ -43,7 +43,7 @@ def get_settings() -> Settings:
         request_char_limit=max(500, min(20000, int(os.getenv("TRANSLATION_REQUEST_CHAR_LIMIT", "6000")))),
         max_retries=max(0, min(10, int(os.getenv("TRANSLATION_MAX_RETRIES", "5")))),
         host=os.getenv("APP_HOST", "127.0.0.1").strip(),
-        port=int(os.getenv("APP_PORT", "8765")),
+        port=int(os.getenv("APP_PORT", "6670")),
     )
 
 
@@ -69,7 +69,7 @@ def save_translation_settings(
             "TRANSLATION_REQUEST_CHAR_LIMIT": str(max(500, min(20000, request_char_limit))),
             "TRANSLATION_MAX_RETRIES": str(max(0, min(10, max_retries))),
             "APP_HOST": current.get("APP_HOST") or "127.0.0.1",
-            "APP_PORT": current.get("APP_PORT") or "8765",
+            "APP_PORT": current.get("APP_PORT") or "6670",
         }
     )
     lines = [f"{key}={_quote_env(str(value))}" for key, value in current.items() if value is not None]

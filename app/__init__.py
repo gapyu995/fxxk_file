@@ -1,1 +1,1 @@
-"""Translator local bilingual translation workspace."""
+"""LinguaBridge local bilingual translation workspace."""

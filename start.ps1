@@ -16,6 +16,5 @@ if (-not (Test-Path -LiteralPath ".env")) {
     Copy-Item -LiteralPath ".env.example" -Destination ".env"
 }
 
-Write-Host "浏览器地址：http://127.0.0.1:8765" -ForegroundColor Green
-& $VenvPython tools\run.py
-
+Write-Host "浏览器地址：http://127.0.0.1:6670（可在 .env 中通过 APP_PORT 修改）" -ForegroundColor Green
+& $VenvPython tools\linguabridge.py
