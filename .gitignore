@@ -8,7 +8,6 @@ __pycache__/
 # PyInstaller build artifacts
 build/
 dist/
-fxxk_file-portable*.zip
 
 # Runtime files
 inbox/*
