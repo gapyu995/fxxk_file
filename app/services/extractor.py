@@ -8,6 +8,8 @@ from pathlib import Path
 from docx import Document
 from pypdf import PdfReader
 
+from app.services.segmenter import join_lines
+
 
 SUPPORTED_EXTENSIONS = {".doc", ".docx", ".pdf"}
 
@@ -57,7 +59,7 @@ def _extract_pdf(path: Path) -> list[str]:
 
 
 def _extract_legacy_doc(path: Path) -> list[str]:
-    with tempfile.TemporaryDirectory(prefix="chanslator-") as temp_dir:
+    with tempfile.TemporaryDirectory(prefix="fxxk_file-") as temp_dir:
         converted = convert_legacy_doc(path, Path(temp_dir))
         return _extract_docx(converted)
 
@@ -118,10 +120,10 @@ def _paragraphs_from_text(text: str) -> list[str]:
         stripped = line.strip()
         if not stripped:
             if current:
-                paragraphs.append(" ".join(current))
+                paragraphs.append(join_lines(current))
                 current = []
         else:
             current.append(stripped)
     if current:
-        paragraphs.append(" ".join(current))
+        paragraphs.append(join_lines(current))
     return paragraphs

@@ -15,9 +15,10 @@ const state = {
   previewZoom: 1,
   translationFontSize: 16,
   sourcePanePercent: 50,
+  pendingTranslateAfterSettings: false,
 };
 
-const DISPLAY_PREFERENCES_KEY = "chanslator-display-preferences-v1";
+const DISPLAY_PREFERENCES_KEY = "fxxk_file-display-preferences-v1";
 
 const $ = (selector) => document.querySelector(selector);
 const elements = {
@@ -38,6 +39,7 @@ const elements = {
   targetHeading: $("#targetHeading"),
   translationCoverage: $("#translationCoverage"),
   translateButton: $("#translateButton"),
+  retranslateButton: $("#retranslateButton"),
   segmentRows: $("#segmentRows"),
   progressWrap: $("#progressWrap"),
   progressBar: $("#progressBar"),
@@ -134,6 +136,7 @@ function bindEvents() {
   elements.closeCompareWorkspace.addEventListener("click", () => { elements.compareWorkspace.classList.add("hidden"); elements.reviewWorkspace.classList.remove("hidden"); elements.functionSelect.value="translate"; applyFunctionTheme("translate"); });
   for (const b of [elements.compareZoomOut,elements.compareZoomIn,elements.compareZoomReset]) b.addEventListener("click",()=>setCompareZoom(b===elements.compareZoomOut?state.compareZoom-.1:b===elements.compareZoomIn?state.compareZoom+.1:1));
   elements.translateButton.addEventListener("click", () => startTranslation(false));
+  elements.retranslateButton.addEventListener("click", confirmRetranslateAll);
   elements.sourceLanguage.addEventListener("change", keepDirectionDistinct);
   elements.targetLanguage.addEventListener("change", keepDirectionDistinct);
   elements.fileViewButton.addEventListener("click", () => setViewMode("file"));
@@ -168,6 +171,8 @@ function bindEvents() {
     if (!hasFiles(event)) return;
     event.preventDefault();
     state.dragDepth += 1;
+    elements.uploadOverlay.querySelector("strong").textContent =
+      elements.functionSelect.value === "compare" ? "松开即可开始对比" : "松开即可导入并翻译";
     elements.uploadOverlay.classList.remove("hidden");
   });
   document.body.addEventListener("dragleave", (event) => {
@@ -180,7 +185,12 @@ function bindEvents() {
     event.preventDefault();
     state.dragDepth = 0;
     elements.uploadOverlay.classList.add("hidden");
-    uploadFiles([...event.dataTransfer.files]);
+    const files = [...event.dataTransfer.files];
+    if (elements.functionSelect.value === "compare") {
+      runFileCompare(files);
+    } else {
+      uploadFiles(files);
+    }
   });
   window.addEventListener("beforeunload", saveBeforeClose);
 }
@@ -194,15 +204,43 @@ state.compareZoom = 1;
 async function startFileCompare() {
   const files=[...elements.compareFilesInput.files].slice(0, 2);
   if(!files[0]||!files[1]) return;
-  const imageA = files[0].type.startsWith("image/");
-  const imageB = files[1].type.startsWith("image/");
+  await runFileCompare(files);
+}
+
+async function runFileCompare(files) {
+  const pair = files.slice(0, 2);
+  if (!pair[0] || !pair[1]) { showToast("请一次提供两份文件进行对比。", true); return; }
+  const imageA = pair[0].type.startsWith("image/");
+  const imageB = pair[1].type.startsWith("image/");
   if (imageA !== imageB) { showToast("双文件对比只支持文档与文档，或图片与图片，不能混合选择。", true); return; }
-  setCompareProgress(0, `正在准备 ${files.length} 份文件…`);
-  elements.compareDialog.close(); elements.reviewWorkspace.classList.add("hidden"); elements.compareWorkspace.classList.remove("hidden");
-  elements.compareLeftTitle.textContent=files[0].name; elements.compareRightTitle.textContent=files[1].name; elements.compareStatus.textContent="正在载入…";
-  for (let i=0;i<files.length;i++) { setCompareProgress(Math.round(i/files.length*100), `正在读取第 ${i+1}/${files.length} 份文件…`); await renderCompareFile(files[i], i===0?elements.compareLeft:elements.compareRight); setCompareProgress(Math.round((i+1)/files.length*100), `已读取第 ${i+1}/${files.length} 份文件`); }
-  elements.compareStatus.textContent="已载入，可同步滚动对比"; setTimeout(()=>elements.compareUploadProgress.classList.add("hidden"),500);
-  bindCompareScroll(); bindCompareCanvasInteractions();
+  if (!imageA && pair.some((file) => !/\.(doc|docx|pdf)$/i.test(file.name))) {
+    showToast("双文件对比的文档仅支持 DOC、DOCX 或 PDF。", true);
+    return;
+  }
+  if (elements.compareDialog.open) elements.compareDialog.close();
+  elements.functionSelect.value = "compare";
+  applyFunctionTheme("compare");
+  elements.reviewWorkspace.classList.add("hidden");
+  elements.compareWorkspace.classList.remove("hidden");
+  elements.compareLeftTitle.textContent = pair[0].name;
+  elements.compareRightTitle.textContent = pair[1].name;
+  elements.compareStatus.textContent = "正在载入…";
+  setCompareProgress(0, `正在准备 ${pair.length} 份文件…`);
+  try {
+    for (let i = 0; i < pair.length; i++) {
+      setCompareProgress(Math.round(i / pair.length * 100), `正在读取第 ${i + 1}/${pair.length} 份文件…`);
+      await renderCompareFile(pair[i], i === 0 ? elements.compareLeft : elements.compareRight);
+      setCompareProgress(Math.round((i + 1) / pair.length * 100), `已读取第 ${i + 1}/${pair.length} 份文件`);
+    }
+    elements.compareStatus.textContent = "已载入，可同步滚动对比";
+    setTimeout(() => elements.compareUploadProgress.classList.add("hidden"), 500);
+    bindCompareScroll();
+    bindCompareCanvasInteractions();
+  } catch (error) {
+    elements.compareStatus.textContent = "载入失败";
+    elements.compareUploadProgress.classList.add("hidden");
+    showToast(`对比文件载入失败：${error.message}`, true);
+  }
 }
 function setCompareProgress(percent, status) { elements.compareUploadProgress.classList.remove("hidden"); elements.compareUploadBar.style.width=`${percent}%`; elements.compareUploadPercent.textContent=`${percent}%`; elements.compareUploadStatus.textContent=status; }
 async function renderCompareFile(file, target){ target.replaceChildren(); target.dataset.kind=""; if(file.type.startsWith("image/")){ const img=new Image(); img.src=URL.createObjectURL(file); img.className="compare-image"; target.append(img); target.dataset.kind="image"; return; }
@@ -254,7 +292,7 @@ function setPreviewZoom(value, force = false) {
   elements.previewZoomOut.disabled = zoom <= 0.6;
   elements.previewZoomIn.disabled = zoom >= 2;
   elements.originalPreview.contentWindow?.postMessage({
-    type: "chanslator-preview-zoom",
+    type: "fxxk_file-preview-zoom",
     zoom,
   }, "*");
   if (!force) saveDisplayPreferences();
@@ -436,6 +474,16 @@ async function saveSettings(event) {
     await loadSettings();
     elements.settingsDialog.close();
     showToast("模型设置已保存。", false);
+    const shouldTranslate = state.pendingTranslateAfterSettings;
+    state.pendingTranslateAfterSettings = false;
+    if (
+      shouldTranslate
+      && elements.autoTranslate.checked
+      && state.current
+      && state.current.status !== "translating"
+    ) {
+      await startTranslation(false);
+    }
   } catch (error) {
     showToast(error.message, true);
   } finally {
@@ -476,6 +524,7 @@ async function uploadFiles(files) {
           await startTranslation(false);
         } else {
           showToast("文档已解析。配置模型后即可开始翻译。", false);
+          state.pendingTranslateAfterSettings = true;
           await openSettings();
         }
       }
@@ -517,6 +566,12 @@ async function loadDocumentList() {
     remove.addEventListener("click", () => deleteDocumentRecord(documentData));
     item.append(button, remove);
     elements.documentList.append(item);
+  }
+  if (!documents.length) {
+    const empty = document.createElement("p");
+    empty.className = "document-list-empty";
+    empty.textContent = "暂无最近文档。拖入文件后，任务会显示在这里。";
+    elements.documentList.append(empty);
   }
   return documents;
 }
@@ -682,6 +737,7 @@ function updateDocumentMeta(documentData) {
   elements.progressWrap.classList.toggle("hidden", documentData.status !== "translating");
   elements.translateButton.disabled = documentData.status === "translating";
   elements.translateButton.textContent = documentData.status === "translating" ? "正在翻译…" : "翻译空白段落";
+  elements.retranslateButton.disabled = documentData.status === "translating";
   if (documentData.status === "error" && documentData.error) {
     elements.statusBadge.title = documentData.error;
   }
@@ -1123,7 +1179,7 @@ function syncTranslationToPreview() {
     const sourceProgress = sourceProgressFromTranslationScroll();
     if (!scrollPreviewToDocumentPosition(sourceProgress)) {
       elements.originalPreview.contentWindow?.postMessage({
-        type: "chanslator-sync-scroll",
+        type: "fxxk_file-sync-scroll",
         ratio: sourceProgress,
         source_progress: sourceProgress,
       }, "*");
@@ -1134,11 +1190,11 @@ function syncTranslationToPreview() {
 function handlePreviewMessage(event) {
   if (event.source !== elements.originalPreview.contentWindow || !event.data) return;
   const message = event.data;
-  if (message.type === "chanslator-preview-error") {
+  if (message.type === "fxxk_file-preview-error") {
     elements.previewPageStatus.textContent = message.message || "原件无法分页预览";
     return;
   }
-  if (message.type !== "chanslator-preview-scroll" && message.type !== "chanslator-preview-ready") return;
+  if (message.type !== "fxxk_file-preview-scroll" && message.type !== "fxxk_file-preview-ready") return;
   const pages = Number(message.pages) || 0;
   if (pages > 0) {
     const page = Math.max(1, Math.min(pages, Number(message.page) || 1));
@@ -1146,9 +1202,9 @@ function handlePreviewMessage(event) {
     elements.previewPageStatus.textContent =
       (mapped ? "段落对应第 " : "原件约第 ") + page + " / " + pages + " 页";
   }
-  if (message.type === "chanslator-preview-ready") ensureSegmentPageMap();
+  if (message.type === "fxxk_file-preview-ready") ensureSegmentPageMap();
   if (
-    message.type === "chanslator-preview-scroll"
+    message.type === "fxxk_file-preview-scroll"
     && state.viewMode === "file"
     && elements.syncScroll.checked
     && performance.now() >= translationScrollAuthorityUntil
@@ -1438,6 +1494,17 @@ async function translateSegment(segmentId, button) {
     button.disabled = false;
     button.classList.remove("busy");
   }
+}
+
+async function confirmRetranslateAll() {
+  if (!state.current) return;
+  const documentData = state.current;
+  const hasTranslated = documentData.segments.some((segment) => (segment.translation || "").trim());
+  const message = hasTranslated
+    ? "将重新翻译所有机器译文和空白段落。\n\n已编辑、已审校和已锁定的段落会保留，不会被覆盖。是否继续？"
+    : "当前没有需要重译的内容，将翻译全部空白段落。";
+  if (hasTranslated && !window.confirm(message)) return;
+  await startTranslation(true);
 }
 
 async function startTranslation(overwrite) {

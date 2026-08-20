@@ -21,7 +21,7 @@ def show_error(message: str) -> None:
     try:
         import ctypes
 
-        ctypes.windll.user32.MessageBoxW(0, message, "Translator", 0x10)
+        ctypes.windll.user32.MessageBoxW(0, message, "fxxk_file", 0x10)
     except Exception:
         print(message, file=sys.stderr)
 
@@ -39,7 +39,7 @@ def main() -> None:
     if port_is_open(settings.host, settings.port):
         show_error(
             f"端口 {settings.port} 已被占用。\n\n"
-            "请先关闭已运行的 Translator 或修改 .env 中的 APP_PORT。"
+            "请先关闭已运行的 fxxk_file 或修改 .env 中的 APP_PORT。"
         )
         return
 
@@ -51,7 +51,7 @@ def main() -> None:
         access_log=False,
     )
     server = uvicorn.Server(config)
-    thread = threading.Thread(target=server.run, name="chanslator-server")
+    thread = threading.Thread(target=server.run, name="fxxk_file-server")
     thread.start()
     deadline = time.monotonic() + 12
     while not server.started and thread.is_alive() and time.monotonic() < deadline:
@@ -59,7 +59,7 @@ def main() -> None:
     if not server.started:
         server.should_exit = True
         thread.join(timeout=3)
-        show_error("Translator 本地服务启动失败，请查看项目配置或改用 start.ps1 启动。")
+        show_error("fxxk_file 本地服务启动失败，请查看项目配置或改用 start.ps1 启动。")
         return
 
     url = f"http://{settings.host}:{settings.port}"
@@ -68,7 +68,7 @@ def main() -> None:
         # the translated-DOCX link open the native Windows Save dialog.
         webview.settings["ALLOW_DOWNLOADS"] = True
         webview.create_window(
-            "Translator · 原文件与译文对照",
+            "fxxk_file · 原文件与译文对照",
             url,
             width=1500,
             height=920,

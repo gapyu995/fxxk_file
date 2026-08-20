@@ -52,7 +52,7 @@ async def lifespan(_: FastAPI):
     await asyncio.to_thread(finalize_and_clear_document_records)
 
 
-app = FastAPI(title="LinguaBridge", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="fxxk_file", version="1.0.0", lifespan=lifespan)
 
 
 class TranslationRequest(BaseModel):
@@ -271,7 +271,7 @@ async def preview_original(document_id: str):
         <body><div class='box'><strong>旧版 DOC 无法直接预览</strong>
         二进制 DOC 需要先转换为 DOCX。请安装 LibreOffice，或在 Word/WPS 中另存为 DOCX 后重新拖入；
         DOCX 已可由程序内置渲染器直接显示。</div>
-        <script>if(parent!==window)parent.postMessage({type:'chanslator-preview-error',
+        <script>if(parent!==window)parent.postMessage({type:'fxxk_file-preview-error',
         message:'旧版 DOC 暂无分页预览'},'*');</script></body></html>"""
     )
 
@@ -345,7 +345,7 @@ html,body{min-height:100%;margin:0;background:#dfe4e1;color:#33413a;font-family:
     if(parent===window)return;
     const maxScroll=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);
     parent.postMessage({
-      type:kind==='scroll'?'chanslator-preview-scroll':'chanslator-preview-ready',
+      type:kind==='scroll'?'fxxk_file-preview-scroll':'fxxk_file-preview-ready',
       ratio:maxScroll?window.scrollY/maxScroll:0,
       page:currentPage(),
       pages:Math.max(1,pageElements.length)
@@ -368,7 +368,7 @@ html,body{min-height:100%;margin:0;background:#dfe4e1;color:#33413a;font-family:
   window.addEventListener('message',event=>{
     const message=event.data;
     if(event.source!==parent||!message)return;
-    if(message.type==='chanslator-preview-zoom'){
+    if(message.type==='fxxk_file-preview-zoom'){
       const maxScrollBefore=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);
       const ratio=maxScrollBefore?window.scrollY/maxScrollBefore:0;
       previewZoom=Math.max(.6,Math.min(2,Number(message.zoom)||1));
@@ -381,7 +381,7 @@ html,body{min-height:100%;margin:0;background:#dfe4e1;color:#33413a;font-family:
       });
       return;
     }
-    if(message.type!=='chanslator-sync-scroll')return;
+    if(message.type!=='fxxk_file-sync-scroll')return;
     const ratio=Math.max(0,Math.min(1,Number(message.ratio)||0));
     const maxScroll=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);
     applyingSync=true;
@@ -410,7 +410,7 @@ html,body{min-height:100%;margin:0;background:#dfe4e1;color:#33413a;font-family:
     loading.querySelector('strong').textContent='DOCX 原件渲染失败';
     const detail=loading.querySelector('span');detail.className='error';detail.textContent=error.message;
     if(parent!==window)parent.postMessage({
-      type:'chanslator-preview-error',
+      type:'fxxk_file-preview-error',
       message:'DOCX 原件渲染失败'
     },'*');
   }
@@ -491,7 +491,7 @@ body{overflow:auto}
     if(parent===window)return;
     const maxScroll=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);
     parent.postMessage({
-      type:kind==='scroll'?'chanslator-preview-scroll':'chanslator-preview-ready',
+      type:kind==='scroll'?'fxxk_file-preview-scroll':'fxxk_file-preview-ready',
       ratio:maxScroll?window.scrollY/maxScroll:0,
       page:currentPage(),
       pages:pdfDocument?pdfDocument.numPages:1
@@ -582,7 +582,7 @@ body{overflow:auto}
   window.addEventListener('message',event=>{
     const message=event.data;
     if(event.source!==parent||!message)return;
-    if(message.type==='chanslator-preview-zoom'){
+    if(message.type==='fxxk_file-preview-zoom'){
       const maxScrollBefore=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);
       const ratio=maxScrollBefore?window.scrollY/maxScrollBefore:0;
       previewZoom=Math.max(.6,Math.min(2,Number(message.zoom)||1));
@@ -596,7 +596,7 @@ body{overflow:auto}
       });
       return;
     }
-    if(message.type!=='chanslator-sync-scroll')return;
+    if(message.type!=='fxxk_file-sync-scroll')return;
     const ratio=Math.max(0,Math.min(1,Number(message.ratio)||0));
     const maxScroll=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);
     applyingSync=true;
@@ -650,7 +650,7 @@ body{overflow:auto}
     loading.querySelector('strong').textContent='PDF 原件渲染失败';
     loading.querySelector('span').textContent=error&&error.message?error.message:String(error);
     if(parent!==window)parent.postMessage({
-      type:'chanslator-preview-error',
+      type:'fxxk_file-preview-error',
       message:'PDF 原件渲染失败'
     },'*');
   }

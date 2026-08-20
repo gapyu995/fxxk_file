@@ -4,6 +4,7 @@ import re
 
 
 CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
+CJK_BOUNDARY_RE = re.compile(r"[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]")
 SENTENCE_BOUNDARY_RE = re.compile(r"(?<=[。！？!?；;])|(?<=[.!?])(?=\s+[A-Z0-9\"'])")
 
 
@@ -42,13 +43,33 @@ def _split_long_text(text: str, max_chars: int) -> list[str]:
         elif not current:
             current = sentence
         elif len(current) + 1 + len(sentence) <= max_chars:
-            current += " " + sentence
+            current = join_lines([current, sentence])
         else:
             chunks.append(current)
             current = sentence
     if current:
         chunks.append(current)
     return chunks or [text]
+
+
+def join_lines(lines: list[str]) -> str:
+    """Join wrapped text lines, inserting a space only across non-CJK boundaries.
+
+    PDF extraction and long-text chunking split text on line/sentence breaks.
+    Chinese text must be rejoined without a space ("组合驾驶\n辅助系统" ->
+    "组合驾驶辅助系统"), while wrapped English needs one ("senior\nprofessional").
+    """
+    if not lines:
+        return ""
+    result = lines[0]
+    for line in lines[1:]:
+        if not line:
+            continue
+        if result and CJK_BOUNDARY_RE.fullmatch(result[-1]) and CJK_BOUNDARY_RE.fullmatch(line[0]):
+            result += line
+        else:
+            result += " " + line
+    return result
 
 
 def _clean(text: str) -> str:

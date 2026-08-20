@@ -17,4 +17,4 @@ if (-not (Test-Path -LiteralPath ".env")) {
 }
 
 Write-Host "浏览器地址：http://127.0.0.1:6670（可在 .env 中通过 APP_PORT 修改）" -ForegroundColor Green
-& $VenvPython tools\linguabridge.py
+& $VenvPython tools\fxxk_file.py

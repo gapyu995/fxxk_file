@@ -15,11 +15,11 @@ echo Installing required components. Please wait...
 if errorlevel 1 goto error
 
 :launch
-start "LinguaBridge" /D "%CD%" ".venv\Scripts\pythonw.exe" "tools\desktop.py"
+start "fxxk_file" /D "%CD%" ".venv\Scripts\pythonw.exe" "tools\desktop.py"
 exit /b 0
 
 :error
 echo.
-echo LinguaBridge could not start. Check Python and the network connection.
+echo fxxk_file could not start. Check Python and the network connection.
 pause
 exit /b 1

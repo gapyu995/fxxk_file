@@ -1,1 +1,1 @@
-"""LinguaBridge local bilingual translation workspace."""
+"""fxxk_file local bilingual translation workspace."""

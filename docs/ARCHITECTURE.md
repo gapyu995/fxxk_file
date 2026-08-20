@@ -1,11 +1,11 @@
-# LinguaBridge 结构与功能扩展说明
+# fxxk_file 结构与功能扩展说明
 
-本文档用于后续添加新功能时快速定位代码。Translator 是一个本地运行的 FastAPI + 原生 JavaScript 前端应用。
+本文档用于后续添加新功能时快速定位代码。fxxk_file 是一个本地运行的 FastAPI + 原生 JavaScript 前端应用。
 
 ## 1. 总体结构
 
 ```text
-linguabridge/
+fxxk_file/
 ├─ app/
 │  ├─ main.py                 # FastAPI 路由、预览页面和翻译任务入口
 │  ├─ config.py               # .env 配置读取与保存
@@ -14,7 +14,7 @@ linguabridge/
 │     ├─ index.html           # 主页面结构、顶部功能菜单、各工作区容器
 │     ├─ app.js               # 前端状态、事件、API 调用和工作区切换
 │     └─ styles.css           # 全局样式和各功能工作区样式
-├─ tools/linguabridge.py      # 启动 FastAPI 服务
+├─ tools/fxxk_file.py         # 启动 FastAPI 服务
 ├─ originals/                 # 上传后的原文件
 ├─ workspace/                 # 文档状态和临时工作数据
 ├─ output/                    # 导出的译文文件
@@ -65,7 +65,7 @@ if (value === "new-feature") {
 服务地址由 `.env` 中的 `APP_HOST` 和 `APP_PORT` 控制，当前默认端口为 `6670`。启动入口是 `start.ps1`，开发时也可以直接运行：
 
 ```powershell
-.\.venv\Scripts\python.exe tools\linguabridge.py
+.\.venv\Scripts\python.exe tools\fxxk_file.py
 ```
 
 修改前端后无需重新构建；刷新浏览器即可看到静态文件变化。修改 Python 后需要重启服务。

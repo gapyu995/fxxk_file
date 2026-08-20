@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
-    <title>LinguaBridge · 多功能文档工作台</title>
-    <link rel="stylesheet" href="/styles.css?v=20260819-3" />
+    <title>fxxk_file · 多功能文档工作台</title>
+    <link rel="stylesheet" href="/styles.css?v=20260819-4" />
   </head>
   <body>
     <div class="app-shell">
@@ -13,7 +13,7 @@
         <div class="brand">
           <div class="brand-mark">译</div>
           <div>
-            <strong>LinguaBridge Workbench</strong>
+            <strong>fxxk_file Workbench</strong>
             <span>多功能文档工作台</span>
           </div>
         </div>
@@ -75,6 +75,7 @@
                   <option value="zh">中文</option>
                 </select>
                 <button id="translateButton" class="button primary" type="button">翻译空白段落</button>
+                <button id="retranslateButton" class="button" type="button" title="重新翻译全部机器译文与空白段落，保留已编辑、已审校和锁定的段落">重译全文</button>
                 <button id="fileViewButton" class="button view-button active" type="button" title="左侧查看原始版面，右侧逐段审校">原件版面对照</button>
                 <button id="alignedViewButton" class="button view-button" type="button" title="原文与译文严格逐段并排">逐段精确对照</button>
                 <a id="openOriginalButton" class="button" target="_blank">打开原文件</a>
@@ -182,6 +183,6 @@
     </div>
     <div id="toast" class="toast hidden"></div>
     <script src="/vendor/pdf.min.js"></script>
-    <script src="/app.js?v=20260819-2" defer></script>
+    <script src="/app.js?v=20260819-4" defer></script>
   </body>
 </html>

@@ -79,6 +79,7 @@ select:focus { outline:none; border-color:var(--green); box-shadow:0 0 0 3px rgb
 .icon-button { border: 0; background: transparent; color: var(--muted); cursor: pointer; border-radius: 7px; width: 29px; height: 29px; font-size: 18px; }
 .icon-button:hover { background: var(--line-soft); color: var(--ink); }
 .document-list { display: flex; flex-direction: column; gap: 4px; }
+.document-list-empty { margin: 6px 4px; padding: 16px 12px; border: 1px dashed var(--line); border-radius: 9px; color: var(--muted); font-size: 11px; line-height: 1.7; text-align: center; background: #fbfcfb; }
 .document-item-wrap { position:relative; display:flex; align-items:stretch; border-radius:9px; }
 .document-item-wrap:hover { background:#f0f4f1; }
 .document-item-wrap.active { background:var(--green-soft); }
