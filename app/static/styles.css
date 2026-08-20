@@ -285,6 +285,8 @@ body.resizing-workspace { cursor:col-resize; user-select:none; }
 .settings-dialog label.clear-key input { display:inline-block; width:auto; height:auto; margin:0; accent-color:var(--green); }
 .setting-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .key-hint { color: var(--muted); font-size: 10px; min-height: 15px; margin-top: 5px; }
+.model-hint { margin-top: 7px; padding: 9px 11px; border: 1px solid #d8e6dd; border-radius: 8px; background: #f3faf6; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.model-hint code { font: 11px/1.6 ui-monospace, Consolas, "Courier New", monospace; color: var(--green-dark); background: #e7f2eb; padding: 1px 5px; border-radius: 4px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
 .toast { position: fixed; right: 22px; bottom: 22px; max-width: min(620px,calc(100vw - 44px)); padding: 11px 15px; border-radius: 9px; color: white; background: #26332d; box-shadow: var(--shadow); z-index: 30; font-size: 12px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
 .toast.error { background: #8b3531; }

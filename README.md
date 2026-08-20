@@ -106,8 +106,8 @@ fxxk_file/
 | 配置项 | 默认值 | 说明 |
 |---|---:|---|
 | `TRANSLATION_PROTOCOL` | `openai` | `openai` 或 `anthropic` |
-| `TRANSLATION_BASE_URL` | 示例地址 | 网关基础地址或完整请求地址 |
-| `TRANSLATION_MODEL` | 示例模型名 | 网关提供的模型 ID |
+| `TRANSLATION_BASE_URL` | `https://api.deepseek.com/v1` | 网关基础地址或完整请求地址 |
+| `TRANSLATION_MODEL` | `deepseek-chat` | 网关提供的模型 ID |
 | `TRANSLATION_API_KEY` | 空 | 接口密钥 |
 | `TRANSLATION_USE_SYSTEM_PROXY` | `false` | 是否读取系统/环境代理 |
 | `TRANSLATION_BATCH_SIZE` | `3` | 每次请求最多段落数，范围 1–10 |
@@ -115,6 +115,7 @@ fxxk_file/
 | `TRANSLATION_MAX_RETRIES` | `5` | 可重试错误的最大重试次数，范围 0–10 |
 | `APP_HOST` | `127.0.0.1` | 本地服务监听地址 |
 | `APP_PORT` | `6670` | 本地服务端口 |
+| `APP_DOWNLOAD_DIR` | `D:\` | 下载译文时另存为对话框的默认目录 |
 
 除非确实需要局域网访问，否则不要把 `APP_HOST` 改为 `0.0.0.0`。
 

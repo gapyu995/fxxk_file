@@ -13,16 +13,16 @@ from docx import Document
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.shared import Inches, Pt
 
-from app.config import ROOT
+from app.config import DATA_ROOT, RESOURCE_ROOT
 from app.services.extractor import convert_legacy_doc, find_soffice, iter_docx_text_paragraphs
 
 
-INBOX = ROOT / "inbox"
-ORIGINALS = ROOT / "originals"
-WORKSPACE = ROOT / "workspace"
-OUTPUT = ROOT / "output"
-GLOSSARIES = ROOT / "glossaries"
-STATIC = ROOT / "app" / "static"
+INBOX = DATA_ROOT / "inbox"
+ORIGINALS = DATA_ROOT / "originals"
+WORKSPACE = DATA_ROOT / "workspace"
+OUTPUT = DATA_ROOT / "output"
+GLOSSARIES = DATA_ROOT / "glossaries"
+STATIC = RESOURCE_ROOT / "app" / "static"
 
 _locks: dict[str, threading.RLock] = {}
 _master_lock = threading.Lock()
@@ -174,8 +174,8 @@ def create_docx_exports(document: dict[str, Any]) -> tuple[Path, Path]:
 
 def original_path(document: dict[str, Any]) -> Path:
     relative = Path(document["original_path"])
-    path = (ROOT / relative).resolve()
-    path.relative_to(ROOT.resolve())
+    path = (DATA_ROOT / relative).resolve()
+    path.relative_to(DATA_ROOT.resolve())
     if not path.is_file():
         raise FileNotFoundError(path)
     return path

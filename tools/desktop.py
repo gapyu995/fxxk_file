@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import socket
 import sys
 import threading
@@ -34,8 +35,57 @@ def port_is_open(host: str, port: int) -> bool:
         return False
 
 
+def _patch_download_directory(download_dir: str) -> None:
+    """Default pywebview's save-as dialog to ``download_dir``.
+
+    Falls back to the user's Downloads folder when the configured directory does
+    not exist (for example on a machine without a D: drive).
+    """
+    try:
+        import winreg
+
+        from webview.platforms import edgechromium
+    except Exception:
+        return  # non-Windows backend or unavailable; keep pywebview defaults
+
+    downloads_guid = "{374DE290-123F-4565-9164-39C4925E467B}"
+
+    def _default_directory() -> str:
+        candidate = download_dir.strip()
+        if candidate and Path(candidate).is_dir():
+            return candidate
+        try:
+            with winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders",
+            ) as key:
+                return winreg.QueryValueEx(key, downloads_guid)[0]
+        except Exception:
+            return ""
+
+    def on_download_starting(self, sender, args):
+        if not webview.settings.get("ALLOW_DOWNLOADS", False):
+            args.Cancel = True
+            return
+        dialog = edgechromium.WinForms.SaveFileDialog()
+        initial = _default_directory()
+        if initial:
+            dialog.InitialDirectory = initial
+        dialog.Filter = self.pywebview_window.localization["windows.fileFilter.allFiles"] + " (*.*)|*.*"
+        dialog.RestoreDirectory = True
+        dialog.FileName = os.path.basename(args.ResultFilePath)
+        result = dialog.ShowDialog(self.form)
+        if result == edgechromium.WinForms.DialogResult.OK:
+            args.ResultFilePath = dialog.FileName
+        else:
+            args.Cancel = True
+
+    edgechromium.EdgeChrome.on_download_starting = on_download_starting
+
+
 def main() -> None:
     settings = get_settings()
+    _patch_download_directory(settings.download_dir)
     if port_is_open(settings.host, settings.port):
         show_error(
             f"端口 {settings.port} 已被占用。\n\n"

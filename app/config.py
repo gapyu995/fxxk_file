@@ -1,14 +1,43 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import dotenv_values, load_dotenv
 
 
-ROOT = Path(__file__).resolve().parents[1]
-ENV_FILE = ROOT / ".env"
+def _is_frozen() -> bool:
+    return bool(getattr(sys, "frozen", False))
+
+
+def _resource_root() -> Path:
+    """Read-only bundled resources (e.g. app/static).
+
+    In a PyInstaller build, data files are extracted into ``sys._MEIPASS``;
+    in a source checkout this is the project root.
+    """
+    if _is_frozen():
+        return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+    return Path(__file__).resolve().parents[1]
+
+
+def _data_root() -> Path:
+    """Writable user data (`.env`, originals/, output/, workspace/, glossaries/).
+
+    A portable build keeps data next to the executable so the whole folder is
+    self-contained; a source checkout keeps it in the project root.
+    """
+    if _is_frozen():
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parents[1]
+
+
+RESOURCE_ROOT = _resource_root()
+DATA_ROOT = _data_root()
+ROOT = DATA_ROOT  # backward-compatible alias
+ENV_FILE = DATA_ROOT / ".env"
 
 
 @dataclass(frozen=True)
@@ -23,6 +52,7 @@ class Settings:
     max_retries: int
     host: str
     port: int
+    download_dir: str
 
     @property
     def translation_configured(self) -> bool:
@@ -35,8 +65,8 @@ def get_settings() -> Settings:
     load_dotenv(ENV_FILE, override=True)
     return Settings(
         api_key=os.getenv("TRANSLATION_API_KEY", "").strip(),
-        base_url=os.getenv("TRANSLATION_BASE_URL", "https://api.openai.com/v1").strip().rstrip("/"),
-        model=os.getenv("TRANSLATION_MODEL", "gpt-4.1-mini").strip(),
+        base_url=os.getenv("TRANSLATION_BASE_URL", "https://api.deepseek.com/v1").strip().rstrip("/"),
+        model=os.getenv("TRANSLATION_MODEL", "deepseek-chat").strip(),
         protocol=os.getenv("TRANSLATION_PROTOCOL", "openai").strip().lower(),
         use_system_proxy=os.getenv("TRANSLATION_USE_SYSTEM_PROXY", "false").strip().lower() in {"1", "true", "yes", "on"},
         batch_size=max(1, min(10, int(os.getenv("TRANSLATION_BATCH_SIZE", "3")))),
@@ -44,6 +74,7 @@ def get_settings() -> Settings:
         max_retries=max(0, min(10, int(os.getenv("TRANSLATION_MAX_RETRIES", "5")))),
         host=os.getenv("APP_HOST", "127.0.0.1").strip(),
         port=int(os.getenv("APP_PORT", "6670")),
+        download_dir=os.getenv("APP_DOWNLOAD_DIR", "D:\\").strip(),
     )
 
 

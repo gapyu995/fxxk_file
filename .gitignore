@@ -5,6 +5,11 @@ __pycache__/
 .env
 .pytest_cache/
 
+# PyInstaller build artifacts
+build/
+dist/
+fxxk_file-portable*.zip
+
 # Runtime files
 inbox/*
 !inbox/.gitkeep

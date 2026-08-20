@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
     <title>fxxk_file · 多功能文档工作台</title>
-    <link rel="stylesheet" href="/styles.css?v=20260819-4" />
+    <link rel="stylesheet" href="/styles.css?v=20260819-5" />
   </head>
   <body>
     <div class="app-shell">
@@ -149,7 +149,8 @@
           </select>
         </label>
         <label>网关地址或完整请求地址<input id="baseUrl" name="baseUrl" type="url" required placeholder="http://127.0.0.1:端口/v1" /></label>
-        <label>模型名称<input id="modelName" name="modelName" type="text" required placeholder="gpt-4.1-mini" /></label>
+        <label>模型名称<input id="modelName" name="modelName" type="text" required placeholder="deepseek-chat" /></label>
+        <div class="model-hint">可支持模型：<code>deepseek-chat</code>（通用对话）、<code>deepseek-reasoner</code>（深度推理），也兼容其它 OpenAI / Anthropic 网关的模型 ID。使用外网模型（如 DeepSeek 官方 API）时请检查网络环境，必要时调整下方「使用系统代理」。</div>
         <div class="setting-grid">
           <label>每次最多段落数<input id="batchSize" type="number" min="1" max="10" step="1" required /></label>
           <label>单次最大原文字符数<input id="requestCharLimit" type="number" min="500" max="20000" step="500" required /></label>

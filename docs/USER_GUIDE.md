@@ -24,7 +24,7 @@
 ### OpenAI 兼容 / CCSwitch
 
 - 接口协议选择“OpenAI 兼容 / CCSwitch 网关”。
-- 地址可填写基础地址，例如 `https://api.example.com/v1`，程序会补上 `/chat/completions`。
+- 地址可填写基础地址，例如 DeepSeek 官方 `https://api.deepseek.com/v1`，程序会补上 `/chat/completions`。
 - 也可以直接填写以 `/chat/completions` 结尾的完整地址。
 - 模型名称必须是网关实际支持的模型 ID。
 - 云端服务通常需要 API Key；本地无鉴权网关可以留空。
