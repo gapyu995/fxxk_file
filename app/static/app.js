@@ -82,6 +82,7 @@ const elements = {
   functionMenu: $("#functionMenu"), functionTrigger: $("#functionTrigger"), functionOptions: $("#functionOptions"), compareFilesInput: $("#compareFilesInput"),
   compareDialog: $("#compareDialog"), closeCompare: $("#closeCompare"), cancelCompare: $("#cancelCompare"), startCompare: $("#startCompare"), compareWorkspace: $("#compareWorkspace"), compareLeft: $("#compareLeft"), compareRight: $("#compareRight"), compareLeftTitle: $("#compareLeftTitle"), compareRightTitle: $("#compareRightTitle"), compareStatus: $("#compareStatus"), compareSync: $("#compareSync"), compareZoomOut: $("#compareZoomOut"), compareZoomIn: $("#compareZoomIn"), compareZoomReset: $("#compareZoomReset"), compareZoomValue: $("#compareZoomValue"), closeCompareWorkspace: $("#closeCompareWorkspace"),
   compareUploadProgress: $("#compareUploadProgress"), compareUploadStatus: $("#compareUploadStatus"), compareUploadPercent: $("#compareUploadPercent"), compareUploadBar: $("#compareUploadBar"),
+  imagesWorkspace: $("#imagesWorkspace"), imagesFrame: $("#imagesFrame"), openImagesTool: $("#openImagesTool"), closeImagesWorkspace: $("#closeImagesWorkspace"), imageConvertPngSvg: $("#imageConvertPngSvg"), imageConvertSvgPng: $("#imageConvertSvgPng"),
 };
 
 document.addEventListener("DOMContentLoaded", init);
@@ -113,12 +114,17 @@ function bindEvents() {
   elements.settingsForm.addEventListener("submit", saveSettings);
   elements.functionSelect.addEventListener("change", () => {
     applyFunctionTheme(elements.functionSelect.value);
-    if (elements.functionSelect.value === "compare") {
+    const value = elements.functionSelect.value;
+    elements.compareWorkspace.classList.add("hidden");
+    elements.imagesWorkspace.classList.add("hidden");
+    if (value === "compare") {
       elements.reviewWorkspace.classList.add("hidden");
       elements.compareWorkspace.classList.remove("hidden");
       elements.compareDialog.showModal();
+    } else if (value === "images") {
+      elements.reviewWorkspace.classList.add("hidden");
+      elements.imagesWorkspace.classList.remove("hidden");
     } else {
-      elements.compareWorkspace.classList.add("hidden");
       elements.reviewWorkspace.classList.remove("hidden");
     }
   });
@@ -134,6 +140,10 @@ function bindEvents() {
   elements.cancelCompare.addEventListener("click", () => elements.compareDialog.close());
   elements.startCompare.addEventListener("click", (e) => { e.preventDefault(); startFileCompare(); });
   elements.closeCompareWorkspace.addEventListener("click", () => { elements.compareWorkspace.classList.add("hidden"); elements.reviewWorkspace.classList.remove("hidden"); elements.functionSelect.value="translate"; applyFunctionTheme("translate"); });
+  elements.closeImagesWorkspace.addEventListener("click", () => { elements.imagesWorkspace.classList.add("hidden"); elements.reviewWorkspace.classList.remove("hidden"); elements.functionSelect.value="translate"; applyFunctionTheme("translate"); });
+  elements.imageConvertPngSvg.addEventListener("click", () => switchImagesTool("png-to-svg"));
+  elements.imageConvertSvgPng.addEventListener("click", () => switchImagesTool("svg-to-png"));
+  elements.openImagesTool.addEventListener("click", () => window.open(elements.imagesFrame.src, "_blank"));
   for (const b of [elements.compareZoomOut,elements.compareZoomIn,elements.compareZoomReset]) b.addEventListener("click",()=>setCompareZoom(b===elements.compareZoomOut?state.compareZoom-.1:b===elements.compareZoomIn?state.compareZoom+.1:1));
   elements.translateButton.addEventListener("click", () => startTranslation(false));
   elements.retranslateButton.addEventListener("click", confirmRetranslateAll);
@@ -169,6 +179,7 @@ function bindEvents() {
   }
   document.body.addEventListener("dragenter", (event) => {
     if (!hasFiles(event)) return;
+    if (elements.functionSelect.value === "images") return;
     event.preventDefault();
     state.dragDepth += 1;
     elements.uploadOverlay.querySelector("strong").textContent =
@@ -183,6 +194,7 @@ function bindEvents() {
   document.body.addEventListener("drop", (event) => {
     if (!hasFiles(event)) return;
     event.preventDefault();
+    if (elements.functionSelect.value === "images") return;
     state.dragDepth = 0;
     elements.uploadOverlay.classList.add("hidden");
     const files = [...event.dataTransfer.files];
@@ -197,7 +209,16 @@ function bindEvents() {
 
 function applyFunctionTheme(value) {
   document.body.classList.toggle("compare-theme", value === "compare");
-  document.body.classList.toggle("translate-theme", value !== "compare");
+  document.body.classList.toggle("images-theme", value === "images");
+  document.body.classList.toggle("translate-theme", value !== "compare" && value !== "images");
+}
+
+function switchImagesTool(tool) {
+  elements.imageConvertPngSvg.classList.toggle("active", tool === "png-to-svg");
+  elements.imageConvertSvgPng.classList.toggle("active", tool === "svg-to-png");
+  elements.imagesFrame.src = tool === "svg-to-png"
+    ? "/tools/image-convert/svg-to-png.html"
+    : "/tools/image-convert/png-to-svg.html";
 }
 
 state.compareZoom = 1;

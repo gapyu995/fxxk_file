@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
     <title>fxxk_file · 多功能文档工作台</title>
-    <link rel="stylesheet" href="/styles.css?v=20260819-5" />
+    <link rel="stylesheet" href="/styles.css?v=20260819-6" />
   </head>
   <body>
     <div class="app-shell">
@@ -18,7 +18,7 @@
           </div>
         </div>
         <div class="top-actions">
-          <div class="function-menu" id="functionMenu"><span class="function-icon">✦</span><span class="function-label">功能</span><button id="functionTrigger" class="function-trigger" type="button">文档翻译 <span>⌄</span></button><div id="functionOptions" class="function-options"><button type="button" data-value="translate">文档翻译</button><button type="button" data-value="compare">双文件对比</button></div><select id="functionSelect" hidden><option value="translate">文档翻译</option><option value="compare">双文件对比</option></select></div>
+          <div class="function-menu" id="functionMenu"><span class="function-icon">✦</span><span class="function-label">功能</span><button id="functionTrigger" class="function-trigger" type="button">文档翻译 <span>⌄</span></button><div id="functionOptions" class="function-options"><button type="button" data-value="translate">文档翻译</button><button type="button" data-value="compare">双文件对比</button><button type="button" data-value="images">图片转换</button></div><select id="functionSelect" hidden><option value="translate">文档翻译</option><option value="compare">双文件对比</option><option value="images">图片转换</option></select></div>
           <span id="saveState" class="save-state">已保存</span>
           <button id="settingsButton" class="button subtle" type="button"><span class="dot" id="configDot"></span>模型设置</button>
         </div>
@@ -179,11 +179,27 @@
       <div class="compare-panels"><div class="compare-panel"><div id="compareLeftTitle" class="compare-panel-title"></div><div id="compareLeft" class="compare-canvas"></div></div><div class="compare-divider"></div><div class="compare-panel"><div id="compareRightTitle" class="compare-panel-title"></div><div id="compareRight" class="compare-canvas"></div></div></div>
     </section>
 
+    <section id="imagesWorkspace" class="images-workspace hidden">
+      <div class="images-toolbar">
+        <strong>图片转换</strong>
+        <div class="images-tabs" role="group" aria-label="转换方向">
+          <button id="imageConvertPngSvg" class="button active" type="button" data-images-tool="png-to-svg">PNG → SVG</button>
+          <button id="imageConvertSvgPng" class="button" type="button" data-images-tool="svg-to-png">SVG → PNG</button>
+        </div>
+        <span class="images-hint">图片仅在本机浏览器处理，不会上传到服务器</span>
+        <span class="images-toolbar-actions">
+          <button id="openImagesTool" class="button" type="button" title="在新标签页打开当前转换工具">新窗口打开</button>
+          <button id="closeImagesWorkspace" class="button" type="button">返回文档翻译</button>
+        </span>
+      </div>
+      <iframe id="imagesFrame" class="images-frame" src="/tools/image-convert/png-to-svg.html" title="图片转换工具"></iframe>
+    </section>
+
     <div id="uploadOverlay" class="upload-overlay hidden">
       <div><span>＋</span><strong>松开即可导入并翻译</strong></div>
     </div>
     <div id="toast" class="toast hidden"></div>
     <script src="/vendor/pdf.min.js"></script>
-    <script src="/app.js?v=20260819-4" defer></script>
+    <script src="/app.js?v=20260819-5" defer></script>
   </body>
 </html>
