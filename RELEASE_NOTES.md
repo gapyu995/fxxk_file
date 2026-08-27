@@ -1,3 +1,29 @@
+# fxxk_file v1.6.0
+
+2026-08-27
+
+本次更新完成后端模块化重构，缩短 FastAPI 入口并补充可持续集成检查，保持现有接口路径和翻译流程兼容。
+
+## 重构
+
+- `app/main.py` 现在只负责导出 ASGI 应用，应用工厂、生命周期和静态资源挂载统一放入 `app/application.py`。
+- 按职责拆分系统、文档和翻译 API 路由，Pydantic 请求模型集中到 `app/api/schemas.py`。
+- 将 DOCX/PDF 预览 HTML 移入 `app/services/preview.py`，将后台翻译批处理、重试和进度逻辑移入 `app/services/translation_job.py`。
+- 使用 `app/core/runtime.py` 集中管理上传大小限制和运行中任务，避免路由循环导入入口文件。
+
+## CI/CD
+
+- 新增 `.github/workflows/ci.yml`，在 push 和 pull request 时自动安装依赖、编译 Python、导入应用并检查关键路由。
+- 新增 [后端结构说明](docs/BACKEND_STRUCTURE.md)，明确路由、服务和运行时状态的模块边界及本地检查命令。
+
+## 验证
+
+- 通过 `python -m compileall -q app tools`。
+- 通过应用导入、路由枚举和首页、健康检查、设置及静态资源 HTTP smoke test。
+- 通过 `git diff --check`。
+
+---
+
 # fxxk_file v1.5.0
 
 2026-08-27

@@ -159,3 +159,4 @@ fxxk_file/
 ## 开源组件
 
 文档预览使用内置的 PDF.js 3.11.174、docx-preview 0.3.6 和 JSZip 3.10.1。相应许可证位于 `app/static/vendor/`。
+Backend module boundaries and CI/CD checks are documented in [docs/BACKEND_STRUCTURE.md](docs/BACKEND_STRUCTURE.md).

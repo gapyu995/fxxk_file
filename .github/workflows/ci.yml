@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Compile backend
+        run: python -m compileall -q app tools
+
+      - name: Import application and inspect routes
+        run: |
+          python - <<'PY'
+          from app.main import app
+
+          assert app.title == "fxxk_file"
+          paths = {route.path for route in app.routes if hasattr(route, "path")}
+          required = {"/", "/api/health", "/api/settings", "/api/documents"}
+          missing = required - paths
+          if missing:
+              raise SystemExit(f"missing routes: {sorted(missing)}")
+          print(f"validated {len(paths)} routes")
+          PY
+
+      - name: Check whitespace
+        run: git diff --check

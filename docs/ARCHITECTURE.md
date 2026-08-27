@@ -84,3 +84,4 @@ if (value === "new-feature") {
 - 是否避免把不必要的文件上传到服务器？
 - 是否更新使用说明和本结构文档？
 - 是否运行 `node --check app/static/app.js` 检查前端语法？
+Backend routes and services are now split by responsibility. See [BACKEND_STRUCTURE.md](BACKEND_STRUCTURE.md) for the module map and CI/CD checks.
