@@ -1,0 +1,41 @@
+/* Responsive and container-query adjustments. */
+
+@media (max-width: 980px) {
+  .markdown-workspace { left:220px; }
+  .markdown-toc { width:170px; }
+  .markdown-toolbar { align-items:flex-start; flex-direction:column; }
+  .markdown-toolbar-actions { width:100%; justify-content:flex-start; }
+}
+@media (max-width: 680px) {
+  .markdown-workspace { inset:64px 0 0; }
+  .markdown-toc { display:none; }
+  .markdown-rendered { width:calc(100% - 30px); margin-left:15px; padding-top:28px; font-size:calc(15px * var(--md-scale)); }
+  .markdown-editor { width:calc(100% - 30px); height:calc(100% - 30px); margin:15px; padding:16px; font-size:13px; }
+  .markdown-content.markdown-editing { grid-template-columns:1fr; grid-template-rows:minmax(0,1fr) minmax(0,1fr); overflow:hidden; }
+  .markdown-content.markdown-editing .markdown-editor { border-right:0; border-bottom:1px solid #dfe4ed; }
+  .markdown-content.markdown-editing .markdown-rendered { padding:22px 15px 60px; }
+  .markdown-toolbar { padding:9px 14px; }
+  .markdown-toolbar-title span:last-child { max-width:55vw; }
+  .markdown-toolbar-actions { gap:5px; }
+  .markdown-toolbar-actions .button { padding:7px 9px; font-size:11px; }
+  .markdown-rendered table { min-width:360px; }
+}
+
+@media (max-width: 980px) {
+  .body-layout { grid-template-columns: 220px minmax(0,1fr); }
+  .document-toolbar { align-items: flex-start; flex-direction: column; }
+  .toolbar-actions { width: 100%; }
+  .column-headings, .segment-row { grid-template-columns: 34px minmax(190px,1fr) minmax(190px,1fr) 34px; }
+  #originalPath { display: none; }
+  .review-body.file-view { grid-template-columns: minmax(280px, var(--source-pane-width)) 7px minmax(340px, 1fr); }
+  .review-body.file-view .column-headings, .review-body.file-view .segment-row { grid-template-columns: 34px minmax(190px,1fr) 34px; }
+}
+
+@container source-pane (max-width: 420px) {
+  #previewPageStatus { display:none; }
+  .preview-tools { gap:8px; }
+}
+
+@container translation-pane (max-width: 470px) {
+  .translation-coverage { display:none; }
+}

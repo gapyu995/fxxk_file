@@ -19,6 +19,12 @@ const state = {
   markdownFontScale: 1,
   markdownTableFit: true,
   markdownObjectUrl: null,
+  markdownSource: "",
+  markdownFileName: "untitled.md",
+  markdownFileSize: 0,
+  markdownEditMode: false,
+  markdownEditTimer: 0,
+  markdownScrollSyncing: false,
 };
 
 const DISPLAY_PREFERENCES_KEY = "fxxk_file-display-preferences-v1";
@@ -86,8 +92,23 @@ const elements = {
   compareDialog: $("#compareDialog"), closeCompare: $("#closeCompare"), cancelCompare: $("#cancelCompare"), startCompare: $("#startCompare"), compareWorkspace: $("#compareWorkspace"), compareLeft: $("#compareLeft"), compareRight: $("#compareRight"), compareLeftTitle: $("#compareLeftTitle"), compareRightTitle: $("#compareRightTitle"), compareStatus: $("#compareStatus"), compareSync: $("#compareSync"), compareZoomOut: $("#compareZoomOut"), compareZoomIn: $("#compareZoomIn"), compareZoomReset: $("#compareZoomReset"), compareZoomValue: $("#compareZoomValue"), closeCompareWorkspace: $("#closeCompareWorkspace"),
   compareUploadProgress: $("#compareUploadProgress"), compareUploadStatus: $("#compareUploadStatus"), compareUploadPercent: $("#compareUploadPercent"), compareUploadBar: $("#compareUploadBar"),
   imagesWorkspace: $("#imagesWorkspace"), imagesFrame: $("#imagesFrame"), openImagesTool: $("#openImagesTool"), closeImagesWorkspace: $("#closeImagesWorkspace"), imageConvertPngSvg: $("#imageConvertPngSvg"), imageConvertSvgPng: $("#imageConvertSvgPng"),
-  markdownWorkspace: $("#markdownWorkspace"), markdownFileInput: $("#markdownFileInput"), markdownFileMeta: $("#markdownFileMeta"), markdownContent: $("#markdownContent"), markdownEmpty: $("#markdownEmpty"), markdownRendered: $("#markdownRendered"), markdownTocList: $("#markdownTocList"), markdownStatus: $("#markdownStatus"), markdownFullscreen: $("#markdownFullscreen"), markdownFontDown: $("#markdownFontDown"), markdownFontReset: $("#markdownFontReset"), markdownFontUp: $("#markdownFontUp"), markdownFontValue: $("#markdownFontValue"), markdownTableFit: $("#markdownTableFit"),
+  markdownWorkspace: $("#markdownWorkspace"), markdownFileInput: $("#markdownFileInput"), markdownFileMeta: $("#markdownFileMeta"), markdownContent: $("#markdownContent"), markdownEmpty: $("#markdownEmpty"), markdownEditor: $("#markdownEditor"), markdownRendered: $("#markdownRendered"), markdownTocList: $("#markdownTocList"), markdownStatus: $("#markdownStatus"), markdownFullscreen: $("#markdownFullscreen"), markdownEditToggle: $("#markdownEditToggle"), markdownDownload: $("#markdownDownload"), markdownFontDown: $("#markdownFontDown"), markdownFontReset: $("#markdownFontReset"), markdownFontUp: $("#markdownFontUp"), markdownFontValue: $("#markdownFontValue"), markdownTableFit: $("#markdownTableFit"),
 };
+
+const markdownFeature = window.MarkdownFeature.create({
+  state,
+  elements,
+  showToast,
+  applyFunctionTheme,
+});
+const compareFeature = window.CompareFeature.create({
+  state,
+  elements,
+  api,
+  showToast,
+  applyFunctionTheme,
+});
+const imagesFeature = window.ImagesFeature.create({ elements });
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -119,7 +140,7 @@ function bindEvents() {
     event.target.value = "";
   });
   elements.markdownFileInput.addEventListener("change", (event) => {
-    openMarkdownFiles([...event.target.files]);
+    markdownFeature.openFiles([...event.target.files]);
     event.target.value = "";
   });
   elements.emptyUpload.addEventListener("click", () => elements.fileInput.click());
@@ -144,7 +165,7 @@ function bindEvents() {
     } else if (value === "markdown") {
       elements.reviewWorkspace.classList.add("hidden");
       elements.markdownWorkspace.classList.remove("hidden");
-      updateMarkdownLayout();
+      markdownFeature.updateLayout();
     } else {
       elements.reviewWorkspace.classList.remove("hidden");
     }
@@ -159,18 +180,27 @@ function bindEvents() {
   document.addEventListener("click", (event) => { if (!elements.functionMenu.contains(event.target)) elements.functionMenu.classList.remove("open"); });
   elements.closeCompare.addEventListener("click", () => elements.compareDialog.close());
   elements.cancelCompare.addEventListener("click", () => elements.compareDialog.close());
-  elements.startCompare.addEventListener("click", (e) => { e.preventDefault(); startFileCompare(); });
+  elements.startCompare.addEventListener("click", (e) => { e.preventDefault(); compareFeature.start(); });
   elements.closeCompareWorkspace.addEventListener("click", () => { elements.compareWorkspace.classList.add("hidden"); elements.reviewWorkspace.classList.remove("hidden"); elements.functionSelect.value="translate"; applyFunctionTheme("translate"); });
   elements.closeImagesWorkspace.addEventListener("click", () => { elements.imagesWorkspace.classList.add("hidden"); elements.reviewWorkspace.classList.remove("hidden"); elements.functionSelect.value="translate"; applyFunctionTheme("translate"); });
-  elements.markdownFullscreen.addEventListener("click", toggleMarkdownFullscreen);
-  elements.markdownFontDown.addEventListener("click", () => setMarkdownFontScale(state.markdownFontScale - 0.1));
-  elements.markdownFontUp.addEventListener("click", () => setMarkdownFontScale(state.markdownFontScale + 0.1));
-  elements.markdownFontReset.addEventListener("click", () => setMarkdownFontScale(1));
-  elements.markdownTableFit.addEventListener("click", toggleMarkdownTableFit);
-  elements.imageConvertPngSvg.addEventListener("click", () => switchImagesTool("png-to-svg"));
-  elements.imageConvertSvgPng.addEventListener("click", () => switchImagesTool("svg-to-png"));
+  elements.markdownFullscreen.addEventListener("click", markdownFeature.toggleFullscreen);
+  elements.markdownEditToggle.addEventListener("click", markdownFeature.toggleEdit);
+  elements.markdownDownload.addEventListener("click", markdownFeature.downloadSource);
+  elements.markdownEditor.addEventListener("input", markdownFeature.handleEditorInput);
+  elements.markdownEditor.addEventListener("scroll", markdownFeature.syncEditorScroll, { passive: true });
+  elements.markdownRendered.addEventListener("scroll", () => {
+    markdownFeature.updateStickyHeading();
+    markdownFeature.syncPreviewScroll();
+  }, { passive: true });
+  elements.markdownFontDown.addEventListener("click", () => markdownFeature.setFontScale(state.markdownFontScale - 0.1));
+  elements.markdownFontUp.addEventListener("click", () => markdownFeature.setFontScale(state.markdownFontScale + 0.1));
+  elements.markdownFontReset.addEventListener("click", () => markdownFeature.setFontScale(1));
+  elements.markdownTableFit.addEventListener("click", markdownFeature.toggleTableFit);
+  elements.markdownContent.addEventListener("scroll", markdownFeature.updateStickyHeading, { passive: true });
+  elements.imageConvertPngSvg.addEventListener("click", () => imagesFeature.switchTool("png-to-svg"));
+  elements.imageConvertSvgPng.addEventListener("click", () => imagesFeature.switchTool("svg-to-png"));
   elements.openImagesTool.addEventListener("click", () => window.open(elements.imagesFrame.src, "_blank"));
-  for (const b of [elements.compareZoomOut,elements.compareZoomIn,elements.compareZoomReset]) b.addEventListener("click",()=>setCompareZoom(b===elements.compareZoomOut?state.compareZoom-.1:b===elements.compareZoomIn?state.compareZoom+.1:1));
+  for (const b of [elements.compareZoomOut,elements.compareZoomIn,elements.compareZoomReset]) b.addEventListener("click",()=>compareFeature.setZoom(b===elements.compareZoomOut?state.compareZoom-.1:b===elements.compareZoomIn?state.compareZoom+.1:1));
   elements.translateButton.addEventListener("click", () => startTranslation(false));
   elements.retranslateButton.addEventListener("click", confirmRetranslateAll);
   elements.sourceLanguage.addEventListener("change", keepDirectionDistinct);
@@ -194,7 +224,8 @@ function bindEvents() {
   window.addEventListener("resize", () => {
     fitSourcePaneToViewport();
     scheduleTranslationLayout();
-    updateMarkdownLayout();
+    markdownFeature.updateLayout();
+    markdownFeature.updateStickyHeading();
   });
 
   for (const target of [document.body, elements.dropzone]) {
@@ -226,9 +257,9 @@ function bindEvents() {
     elements.uploadOverlay.classList.add("hidden");
     const files = [...event.dataTransfer.files];
     if (elements.functionSelect.value === "compare") {
-      runFileCompare(files);
+      compareFeature.runFiles(files);
     } else if (elements.functionSelect.value === "markdown") {
-      openMarkdownFiles(files);
+      markdownFeature.openFiles(files);
     } else {
       uploadFiles(files);
     }
@@ -241,98 +272,6 @@ function applyFunctionTheme(value) {
   document.body.classList.toggle("images-theme", value === "images");
   document.body.classList.toggle("markdown-theme", value === "markdown");
   document.body.classList.toggle("translate-theme", value !== "compare" && value !== "images" && value !== "markdown");
-}
-
-function switchImagesTool(tool) {
-  elements.imageConvertPngSvg.classList.toggle("active", tool === "png-to-svg");
-  elements.imageConvertSvgPng.classList.toggle("active", tool === "svg-to-png");
-  elements.imagesFrame.src = tool === "svg-to-png"
-    ? "/tools/image-convert/svg-to-png.html"
-    : "/tools/image-convert/png-to-svg.html";
-}
-
-state.compareZoom = 1;
-async function startFileCompare() {
-  const files=[...elements.compareFilesInput.files].slice(0, 2);
-  if(!files[0]||!files[1]) return;
-  await runFileCompare(files);
-}
-
-async function runFileCompare(files) {
-  const pair = files.slice(0, 2);
-  if (!pair[0] || !pair[1]) { showToast("请一次提供两份文件进行对比。", true); return; }
-  const imageA = pair[0].type.startsWith("image/");
-  const imageB = pair[1].type.startsWith("image/");
-  if (imageA !== imageB) { showToast("双文件对比只支持文档与文档，或图片与图片，不能混合选择。", true); return; }
-  if (!imageA && pair.some((file) => !/\.(doc|docx|pdf)$/i.test(file.name))) {
-    showToast("双文件对比的文档仅支持 DOC、DOCX 或 PDF。", true);
-    return;
-  }
-  if (elements.compareDialog.open) elements.compareDialog.close();
-  elements.functionSelect.value = "compare";
-  applyFunctionTheme("compare");
-  elements.reviewWorkspace.classList.add("hidden");
-  elements.compareWorkspace.classList.remove("hidden");
-  elements.compareLeftTitle.textContent = pair[0].name;
-  elements.compareRightTitle.textContent = pair[1].name;
-  elements.compareStatus.textContent = "正在载入…";
-  setCompareProgress(0, `正在准备 ${pair.length} 份文件…`);
-  try {
-    for (let i = 0; i < pair.length; i++) {
-      setCompareProgress(Math.round(i / pair.length * 100), `正在读取第 ${i + 1}/${pair.length} 份文件…`);
-      await renderCompareFile(pair[i], i === 0 ? elements.compareLeft : elements.compareRight);
-      setCompareProgress(Math.round((i + 1) / pair.length * 100), `已读取第 ${i + 1}/${pair.length} 份文件`);
-    }
-    elements.compareStatus.textContent = "已载入，可同步滚动对比";
-    setTimeout(() => elements.compareUploadProgress.classList.add("hidden"), 500);
-    bindCompareScroll();
-    bindCompareCanvasInteractions();
-  } catch (error) {
-    elements.compareStatus.textContent = "载入失败";
-    elements.compareUploadProgress.classList.add("hidden");
-    showToast(`对比文件载入失败：${error.message}`, true);
-  }
-}
-function setCompareProgress(percent, status) { elements.compareUploadProgress.classList.remove("hidden"); elements.compareUploadBar.style.width=`${percent}%`; elements.compareUploadPercent.textContent=`${percent}%`; elements.compareUploadStatus.textContent=status; }
-async function renderCompareFile(file, target){ target.replaceChildren(); target.dataset.kind=""; if(file.type.startsWith("image/")){ const img=new Image(); img.src=URL.createObjectURL(file); img.className="compare-image"; target.append(img); target.dataset.kind="image"; return; }
-  const form=new FormData(); form.append("file",file); form.append("source_language","auto"); form.append("target_language","auto"); const doc=await api("/api/documents",{method:"POST",body:form}); const frame=document.createElement("iframe"); frame.src=`/api/documents/${doc.id}/preview`; frame.className="compare-frame"; target.append(frame); target.dataset.kind="document";
-}
-function setCompareZoom(v){ state.compareZoom=Math.max(.5,Math.min(3,Math.round(v*10)/10)); elements.compareZoomValue.textContent=`${Math.round(state.compareZoom*100)}%`; document.querySelectorAll(".compare-image,.compare-frame").forEach(el=>el.style.zoom=state.compareZoom); }
-function bindCompareScroll(){
-  const a=elements.compareLeft,b=elements.compareRight; let syncing=false;
-  [a,b].forEach(src=>src.onscroll=()=>{
-    if(!elements.compareSync.checked || syncing)return;
-    const dst=src===a?b:a; syncing=true;
-    const maxX=Math.max(0,src.scrollWidth-src.clientWidth), maxY=Math.max(0,src.scrollHeight-src.clientHeight);
-    const dstMaxX=Math.max(0,dst.scrollWidth-dst.clientWidth), dstMaxY=Math.max(0,dst.scrollHeight-dst.clientHeight);
-    dst.scrollLeft=(maxX?src.scrollLeft/maxX:0)*dstMaxX;
-    dst.scrollTop=(maxY?src.scrollTop/maxY:0)*dstMaxY;
-    requestAnimationFrame(()=>{syncing=false;});
-  });
-}
-
-function bindCompareCanvasInteractions() {
-  [elements.compareLeft, elements.compareRight].forEach((canvas) => {
-    let dragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
-    canvas.addEventListener("contextmenu", (event) => event.preventDefault());
-    canvas.addEventListener("mousedown", (event) => {
-      if (event.button !== 2 || canvas.dataset.kind !== "image") return;
-      dragging = true; startX = event.clientX; startY = event.clientY;
-      startLeft = canvas.scrollLeft; startTop = canvas.scrollTop;
-      canvas.classList.add("panning"); event.preventDefault();
-    });
-    window.addEventListener("mousemove", (event) => {
-      if (!dragging) return;
-      canvas.scrollLeft = startLeft - (event.clientX - startX);
-      canvas.scrollTop = startTop - (event.clientY - startY);
-    });
-    window.addEventListener("mouseup", () => { dragging = false; canvas.classList.remove("panning"); });
-    canvas.addEventListener("wheel", (event) => {
-      if (canvas.dataset.kind !== "image") return;
-      event.preventDefault();
-      setCompareZoom(state.compareZoom + (event.deltaY < 0 ? 0.1 : -0.1));
-    }, { passive: false });
-  });
 }
 
 function setPreviewZoom(value, force = false) {
@@ -1671,290 +1610,3 @@ function showToast(message, isError, duration) {
   elements.toast.classList.remove("hidden");
   state.toastTimer = setTimeout(() => elements.toast.classList.add("hidden"), duration || (isError ? 7000 : 3500));
 }
-
-// Markdown viewer ---------------------------------------------------------
-function isMarkdownFile(file) {
-  return Boolean(file && /\.(md|markdown|mdown|mkdn|txt)$/i.test(file.name || ""));
-}
-
-async function openMarkdownFiles(files) {
-  const file = (files || []).find(isMarkdownFile);
-  if (!file) {
-    showToast("请选择 .md、.markdown 或 .txt 文件。", true);
-    return;
-  }
-  if (elements.functionSelect.value !== "markdown") {
-    elements.functionSelect.value = "markdown";
-    elements.functionTrigger.firstChild.textContent = "Markdown 查看 ";
-    applyFunctionTheme("markdown");
-    elements.reviewWorkspace.classList.add("hidden");
-    elements.compareWorkspace.classList.add("hidden");
-    elements.imagesWorkspace.classList.add("hidden");
-    elements.markdownWorkspace.classList.remove("hidden");
-  }
-  try {
-    elements.markdownStatus.textContent = "正在读取文件…";
-    const source = await file.text();
-    state.markdownFileName = file.name;
-    renderMarkdownDocument(source, file);
-  } catch (error) {
-    elements.markdownStatus.textContent = "文件读取失败";
-    showToast(`Markdown 文件读取失败：${error.message || error}`, true);
-  }
-}
-
-function renderMarkdownDocument(source, file) {
-  const parsed = markdownToHtml(source);
-  elements.markdownRendered.innerHTML = parsed.html;
-  elements.markdownRendered.classList.remove("hidden");
-  elements.markdownEmpty.classList.add("hidden");
-  elements.markdownFileMeta.textContent = `${file.name} · ${formatMarkdownBytes(file.size)} · ${parsed.lineCount} 行`;
-  elements.markdownStatus.textContent = `${parsed.wordCount.toLocaleString()} 个字符 · ${parsed.headingCount} 个标题 · ${parsed.tableCount} 个表格`;
-  renderMarkdownToc(parsed.toc);
-  setMarkdownFontScale(state.markdownFontScale, false);
-  updateMarkdownLayout();
-}
-
-function formatMarkdownBytes(bytes) {
-  const value = Number(bytes) || 0;
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function escapeMarkdownHtml(value) {
-  return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
-}
-
-function safeMarkdownUrl(value) {
-  const url = String(value || "").trim();
-  if (/^(https?:|mailto:|#|\/|data:image\/(?:png|jpeg|gif|webp);)/i.test(url)) return url;
-  return "#";
-}
-
-function markdownInline(value) {
-  let output = escapeMarkdownHtml(value);
-  const tokens = [];
-  const token = (html) => {
-    const marker = `\u0000MD${tokens.length}\u0000`;
-    tokens.push(html);
-    return marker;
-  };
-  output = output.replace(/!\[([^\]]*)\]\((\S+?)(?:\s+["']([^"']*)["'])?\)/g, (_, alt, url, title) => {
-    const safeUrl = safeMarkdownUrl(url);
-    if (safeUrl === "#") return escapeMarkdownHtml(alt || "图片");
-    const titleAttr = title ? ` title="${escapeMarkdownHtml(title)}"` : "";
-    return token(`<img src="${escapeMarkdownHtml(safeUrl)}" alt="${escapeMarkdownHtml(alt)}"${titleAttr} loading="lazy">`);
-  });
-  output = output.replace(/\[([^\]]+)\]\((\S+?)(?:\s+["']([^"']*)["'])?\)/g, (_, label, url, title) => {
-    const safeUrl = safeMarkdownUrl(url);
-    if (safeUrl === "#") return label;
-    const titleAttr = title ? ` title="${escapeMarkdownHtml(title)}"` : "";
-    return token(`<a href="${escapeMarkdownHtml(safeUrl)}" target="_blank" rel="noopener noreferrer"${titleAttr}>${label}</a>`);
-  });
-  output = output.replace(/`([^`\n]+)`/g, (_, code) => token(`<code>${code}</code>`));
-  output = output.replace(/\*\*([^*\n]+)\*\*|__([^_\n]+)__/g, (_, boldA, boldB) => `<strong>${boldA || boldB}</strong>`);
-  output = output.replace(/~~([^~\n]+)~~/g, "<del>$1</del>");
-  output = output.replace(/\*([^*\n]+)\*|_([^_\n]+)_/g, (_, italicA, italicB) => `<em>${italicA || italicB}</em>`);
-  output = output.replace(/(^|\s)(https?:\/\/[^\s<]+)/g, (_, prefix, url) => `${prefix}${token(`<a href="${escapeMarkdownHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeMarkdownHtml(url)}</a>`)}`);
-  return output.replace(/\u0000MD(\d+)\u0000/g, (_, index) => tokens[Number(index)] || "");
-}
-
-function splitMarkdownTableRow(line) {
-  let value = String(line || "").trim();
-  if (value.startsWith("|")) value = value.slice(1);
-  if (value.endsWith("|")) value = value.slice(0, -1);
-  const cells = [];
-  let current = "";
-  let escaped = false;
-  for (const char of value) {
-    if (char === "|" && !escaped) {
-      cells.push(current.trim().replace(/\\\|/g, "|"));
-      current = "";
-      continue;
-    }
-    if (char === "\\" && !escaped) { escaped = true; current += char; continue; }
-    escaped = false;
-    current += char;
-  }
-  cells.push(current.trim().replace(/\\\|/g, "|"));
-  return cells;
-}
-
-function isMarkdownTableSeparator(line) {
-  const cells = splitMarkdownTableRow(line);
-  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell.trim()));
-}
-
-function renderMarkdownTable(headerLine, separatorLine, rowLines) {
-  const headers = splitMarkdownTableRow(headerLine);
-  const separators = splitMarkdownTableRow(separatorLine);
-  const alignments = headers.map((_, index) => {
-    const cell = separators[index] || "";
-    return cell.startsWith(":") && cell.endsWith(":") ? "center" : cell.startsWith(":") ? "left" : cell.endsWith(":") ? "right" : "";
-  });
-  const head = headers.map((cell, index) => `<th${alignments[index] ? ` style="text-align:${alignments[index]}"` : ""}>${markdownInline(cell)}</th>`).join("");
-  const rows = rowLines.map((line) => {
-    const cells = splitMarkdownTableRow(line);
-    while (cells.length < headers.length) cells.push("");
-    return `<tr>${headers.map((_, index) => `<td${alignments[index] ? ` style="text-align:${alignments[index]}"` : ""}>${markdownInline(cells[index] || "")}</td>`).join("")}</tr>`;
-  }).join("");
-  const rowCount = rowLines.length;
-  return `<div class="markdown-table-wrap" data-row-count="${rowCount}" data-column-count="${headers.length}"><div class="markdown-table-caption"><span>表格</span><span>${rowCount} 行 · ${headers.length} 列</span></div><table aria-rowcount="${rowCount + 1}"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
-}
-
-function markdownToHtml(source) {
-  const lines = String(source || "").replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n");
-  const toc = [];
-  let html = "";
-  let headingCount = 0;
-  let tableCount = 0;
-  let wordCount = 0;
-  let i = 0;
-  const blockStart = (line, next) => /^(?:#{1,6}\s|```|~~~|>|[-*+]\s+|\d+[.)]\s+|---+\s*$|\*\*\*+\s*$)/.test(line) || (next && isMarkdownTableSeparator(next));
-  while (i < lines.length) {
-    const line = lines[i];
-    const trimmed = line.trim();
-    if (!trimmed) { i += 1; continue; }
-    const fence = trimmed.match(/^(```+|~~~+)\s*([\w-]*)\s*$/);
-    if (fence) {
-      const marker = fence[1][0];
-      const codeLines = [];
-      i += 1;
-      while (i < lines.length && !lines[i].trim().startsWith(marker.repeat(fence[1].length))) { codeLines.push(lines[i]); i += 1; }
-      if (i < lines.length) i += 1;
-      const language = fence[2] ? ` class="language-${escapeMarkdownHtml(fence[2])}"` : "";
-      html += `<pre><code${language}>${escapeMarkdownHtml(codeLines.join("\n"))}</code></pre>`;
-      continue;
-    }
-    const heading = line.match(/^\s*(#{1,6})\s+(.+?)\s*#*\s*$/);
-    if (heading) {
-      const level = heading[1].length;
-      const text = heading[2].trim();
-      const id = `markdown-heading-${toc.length + 1}`;
-      toc.push({ id, level, text: text.replace(/[`*_~]/g, "") });
-      headingCount += 1;
-      html += `<h${level} id="${id}">${markdownInline(text)}</h${level}>`;
-      i += 1;
-      continue;
-    }
-    if (/^\s*(?:---+|\*\*\*+|___+)\s*$/.test(line)) { html += "<hr>"; i += 1; continue; }
-    if (i + 1 < lines.length && line.includes("|") && isMarkdownTableSeparator(lines[i + 1])) {
-      const separatorLine = lines[i + 1];
-      const rowLines = [];
-      i += 2;
-      while (i < lines.length && lines[i].trim() && lines[i].includes("|")) { rowLines.push(lines[i]); i += 1; }
-      html += renderMarkdownTable(line, separatorLine, rowLines);
-      tableCount += 1;
-      continue;
-    }
-    if (/^\s*>/.test(line)) {
-      const quoteLines = [];
-      while (i < lines.length && /^\s*>/.test(lines[i])) { quoteLines.push(lines[i].replace(/^\s*>\s?/, "")); i += 1; }
-      html += `<blockquote>${quoteLines.map(markdownInline).join("<br>")}</blockquote>`;
-      continue;
-    }
-    const listMatch = line.match(/^\s*([-*+] |\d+[.)]\s+)/);
-    if (listMatch) {
-      const ordered = /^\s*\d/.test(line);
-      const items = [];
-      while (i < lines.length) {
-        const match = lines[i].match(/^\s*(?:[-*+] |\d+[.)]\s+)(.*)$/);
-        if (!match || (/^\s*\d/.test(lines[i]) !== ordered)) break;
-        let itemText = match[1];
-        const task = itemText.match(/^\[([ xX])\]\s+(.*)$/);
-        if (task) items.push(`<li class="task-item"><input type="checkbox" disabled${task[1].toLowerCase() === "x" ? " checked" : ""}>${markdownInline(task[2])}</li>`);
-        else items.push(`<li>${markdownInline(itemText)}</li>`);
-        i += 1;
-      }
-      html += `<${ordered ? "ol" : "ul"}>${items.join("")}</${ordered ? "ol" : "ul"}>`;
-      continue;
-    }
-    const paragraph = [line];
-    i += 1;
-    while (i < lines.length && lines[i].trim() && !blockStart(lines[i], lines[i + 1])) { paragraph.push(lines[i]); i += 1; }
-    html += `<p>${paragraph.map(markdownInline).join("<br>")}</p>`;
-  }
-  wordCount = String(source || "").replace(/\s/g, "").length;
-  return { html, toc, headingCount, tableCount, wordCount, lineCount: lines.length };
-}
-
-function renderMarkdownToc(toc) {
-  elements.markdownTocList.replaceChildren();
-  if (!toc.length) {
-    elements.markdownTocList.innerHTML = '<span class="markdown-toc-empty">文档中没有标题</span>';
-    return;
-  }
-  const fragment = document.createDocumentFragment();
-  toc.forEach((item) => {
-    const link = document.createElement("a");
-    link.href = `#${item.id}`;
-    link.textContent = item.text;
-    link.className = `toc-level-${Math.min(3, item.level)}`;
-    link.dataset.target = item.id;
-    link.addEventListener("click", (event) => {
-      event.preventDefault();
-      document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-    fragment.append(link);
-  });
-  elements.markdownTocList.append(fragment);
-}
-
-function setMarkdownFontScale(value, persist = true) {
-  state.markdownFontScale = Math.max(0.8, Math.min(1.4, Math.round((Number(value) || 1) * 10) / 10));
-  elements.markdownRendered.style.setProperty("--md-scale", String(state.markdownFontScale));
-  elements.markdownFontValue.textContent = `${Math.round(state.markdownFontScale * 100)}%`;
-  elements.markdownFontDown.disabled = state.markdownFontScale <= 0.8;
-  elements.markdownFontUp.disabled = state.markdownFontScale >= 1.4;
-  if (persist) updateMarkdownLayout();
-}
-
-function toggleMarkdownTableFit() {
-  state.markdownTableFit = !state.markdownTableFit;
-  elements.markdownTableFit.classList.toggle("active", state.markdownTableFit);
-  elements.markdownTableFit.setAttribute("aria-pressed", String(state.markdownTableFit));
-  updateMarkdownLayout();
-}
-
-function updateMarkdownLayout() {
-  if (!elements.markdownRendered || elements.markdownRendered.classList.contains("hidden")) return;
-  const available = elements.markdownContent?.clientWidth || 0;
-  elements.markdownRendered.querySelectorAll(".markdown-table-wrap").forEach((wrap) => {
-    const table = wrap.querySelector("table");
-    if (!table) return;
-    const columns = Number(wrap.dataset.columnCount || table.querySelectorAll("thead th").length || 0);
-    const wide = columns >= 6 || (columns >= 5 && available < 700);
-    wrap.classList.toggle("wide-table", wide);
-    wrap.classList.toggle("no-fit", !state.markdownTableFit);
-    wrap.classList.toggle("compact", state.markdownTableFit && available < 760);
-    table.setAttribute("data-auto-rows", state.markdownTableFit ? "true" : "false");
-  });
-}
-
-async function toggleMarkdownFullscreen() {
-  const workspace = elements.markdownWorkspace;
-  if (!workspace) return;
-  try {
-    if (document.fullscreenElement === workspace) await document.exitFullscreen();
-    else if (workspace.requestFullscreen) await workspace.requestFullscreen();
-    else throw new Error("fullscreen unavailable");
-  } catch (_) {
-    workspace.classList.toggle("fullscreen-fallback");
-    updateMarkdownFullscreenButton();
-  }
-}
-
-function updateMarkdownFullscreenButton() {
-  const active = document.fullscreenElement === elements.markdownWorkspace || elements.markdownWorkspace.classList.contains("fullscreen-fallback");
-  elements.markdownFullscreen.textContent = active ? "退出全屏" : "全屏查看";
-  elements.markdownFullscreen.setAttribute("aria-pressed", String(active));
-}
-
-document.addEventListener("fullscreenchange", updateMarkdownFullscreenButton);
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && elements.markdownWorkspace?.classList.contains("fullscreen-fallback")) {
-    elements.markdownWorkspace.classList.remove("fullscreen-fallback");
-    updateMarkdownFullscreenButton();
-  }
-});

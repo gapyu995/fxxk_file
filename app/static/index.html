@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
     <title>fxxk_file · 多功能文档工作台</title>
-    <link rel="stylesheet" href="/styles.css?v=20260827-markdown" />
+    <link rel="stylesheet" href="/styles.css?v=20260827-structured" />
   </head>
   <body>
     <div class="app-shell">
@@ -246,6 +246,8 @@
         </div>
         <div class="markdown-toolbar-actions">
           <label class="markdown-open-button button primary" for="markdownFileInput">打开 Markdown<input id="markdownFileInput" type="file" accept=".md,.markdown,.mdown,.mkdn,.txt,text/markdown,text/plain" hidden /></label>
+          <button id="markdownEditToggle" class="button" type="button" aria-pressed="false">编辑 Markdown</button>
+          <button id="markdownDownload" class="button" type="button" title="下载当前 Markdown 内容">下载 .md</button>
           <div class="markdown-control-group" role="group" aria-label="文字大小">
             <button id="markdownFontDown" type="button" title="缩小文字">A−</button>
             <button id="markdownFontReset" type="button" title="恢复默认文字大小"><b id="markdownFontValue">100%</b></button>
@@ -268,6 +270,7 @@
             <label class="button primary" for="markdownFileInput">选择 Markdown 文件</label>
             <div class="markdown-empty-features"><span>↔ 响应式排版</span><span>▦ 表格自适应</span><span>⛶ 全屏阅读</span></div>
           </div>
+          <textarea id="markdownEditor" class="markdown-editor hidden" spellcheck="false" aria-label="Markdown 源码编辑器" placeholder="在这里编辑 Markdown 源码…"></textarea>
           <article id="markdownRendered" class="markdown-rendered hidden"></article>
         </main>
       </div>
@@ -279,6 +282,9 @@
     </div>
     <div id="toast" class="toast hidden"></div>
     <script src="/vendor/pdf.min.js"></script>
-    <script src="/app.js?v=20260827-markdown" defer></script>
+    <script src="/scripts/features/compare.js?v=20260827-structured" defer></script>
+    <script src="/scripts/features/images.js?v=20260827-structured" defer></script>
+    <script src="/scripts/features/markdown.js?v=20260827-structured" defer></script>
+    <script src="/app.js?v=20260827-structured" defer></script>
   </body>
 </html>

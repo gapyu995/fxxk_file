@@ -1,0 +1,45 @@
+/* Shared controls, dialogs, feedback, and utility styles. */
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { overflow: hidden; transition: background .25s ease; }
+body.translate-theme { background: radial-gradient(circle at 15% 0%, #f5fbf7 0, var(--canvas) 42%, #eef4f0 100%); }
+body.compare-theme { background: radial-gradient(circle at 85% 0%, #eef6ff 0, #f4f7f8 42%, #e9eef1 100%); }
+button, input, select, textarea { font: inherit; }
+button, select { color: inherit; }
+select { appearance:none; border:1px solid #d4dfd9; border-radius:9px; background:linear-gradient(180deg,#fff,#f7faf8); padding:0 30px 0 11px; font-size:12px; cursor:pointer; transition:border-color .18s,box-shadow .18s,background .18s; }
+select:hover { border-color:#9fc2af; background:#fbfefc; }
+select:focus { outline:none; border-color:var(--green); box-shadow:0 0 0 3px rgba(22,106,75,.12); }
+
+.button { display: inline-flex; align-items: center; justify-content: center; border: 1px solid #d2ddd7; background: linear-gradient(180deg,#fff,#f8faf9); padding: 8px 13px; border-radius: 9px; color: #34423b; font-weight: 650; font-size: 12px; cursor: pointer; white-space: nowrap; text-decoration: none; box-shadow:0 2px 6px rgba(35,62,48,.05); transition:transform .16s,box-shadow .16s,border-color .16s,background .16s; }
+.button:hover { border-color: #9fbead; background: #fbfefc; box-shadow:0 4px 11px rgba(35,62,48,.1); transform:translateY(-1px); }
+.button:active { transform:translateY(0); box-shadow:0 1px 3px rgba(35,62,48,.08); }
+.button.primary { color: white; background: var(--green); border-color: var(--green); }
+.button.primary:hover { background: var(--green-dark); }
+.button:disabled { opacity: .55; cursor: wait; }
+.button.subtle { background: transparent; border-color: transparent; }
+
+.settings-dialog { width: min(520px, calc(100vw - 30px)); border: 0; border-radius: 14px; padding: 0; box-shadow: 0 28px 80px rgba(20,35,28,.25); }
+.settings-dialog::backdrop { background: rgba(15,24,20,.42); backdrop-filter: blur(2px); }
+.settings-dialog form { padding: 24px; }
+.dialog-heading { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.dialog-heading h2 { margin: 0 0 5px; font-family: Georgia, "Noto Serif SC", serif; font-size: 21px; }
+.dialog-heading p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.settings-dialog label { display: block; font-size: 11px; font-weight: 700; margin-top: 13px; }
+.settings-dialog label input, .settings-dialog label select { display: block; width: 100%; height: 40px; margin-top: 6px; border: 1px solid #cfd7d2; border-radius: 8px; padding: 0 11px; background:white; font-size: 12px; outline: none; }
+.settings-dialog label input:focus, .settings-dialog label select:focus { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+.settings-dialog label.clear-key { display:flex; align-items:center; gap:8px; color:var(--muted); font-weight:400; }
+.settings-dialog label.clear-key input { display:inline-block; width:auto; height:auto; margin:0; accent-color:var(--green); }
+.setting-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.key-hint { color: var(--muted); font-size: 10px; min-height: 15px; margin-top: 5px; }
+.model-hint { margin-top: 7px; padding: 9px 11px; border: 1px solid #d8e6dd; border-radius: 8px; background: #f3faf6; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.model-hint code { font: 11px/1.6 ui-monospace, Consolas, "Courier New", monospace; color: var(--green-dark); background: #e7f2eb; padding: 1px 5px; border-radius: 4px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+.toast { position: fixed; right: 22px; bottom: 22px; max-width: min(620px,calc(100vw - 44px)); padding: 11px 15px; border-radius: 9px; color: white; background: #26332d; box-shadow: var(--shadow); z-index: 30; font-size: 12px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
+.toast.error { background: #8b3531; }
+.upload-overlay { position: fixed; inset: 0; z-index: 25; background: rgba(232,243,237,.92); display: grid; place-items: center; border: 6px solid var(--green); }
+.upload-overlay div { display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--green-dark); }
+.upload-overlay span { font-size: 55px; font-weight: 200; }
+.hidden { display: none !important; }
+@keyframes pulse { 50% { opacity: .35; } }
+@keyframes translationGlow { 50% { background:#fffdf6; } }

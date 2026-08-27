@@ -1,0 +1,23 @@
+/* Design tokens shared by every workspace. */
+
+:root {
+  --ink: #18201d;
+  --muted: #66716c;
+  --line: #dfe5e1;
+  --line-soft: #edf0ee;
+  --paper: #ffffff;
+  --canvas: #f5f7f5;
+  --green: #166a4b;
+  --green-dark: #0d5038;
+  --green-soft: #e8f3ed;
+  --amber: #9a6011;
+  --amber-soft: #fff3dc;
+  --red: #a13a35;
+  --red-soft: #fdeceb;
+  --shadow: 0 16px 42px rgba(27, 49, 39, 0.1);
+  --translation-font-size: 16px;
+  --source-pane-width: 50%;
+  font-family: Inter, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--canvas);
+}

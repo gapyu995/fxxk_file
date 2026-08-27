@@ -13,7 +13,12 @@ fxxk_file/
 │  └─ static/
 │     ├─ index.html           # 主页面结构、顶部功能菜单、各工作区容器
 │     ├─ app.js               # 前端状态、事件、API 调用和工作区切换
-│     └─ styles.css           # 全局样式和各功能工作区样式
+│     ├─ scripts/features/    # 按页面拆分的前端功能模块
+│     │  ├─ markdown.js       # Markdown 查看、编辑和实时预览
+│     │  ├─ compare.js        # 双文件对比加载和缩放
+│     │  └─ images.js         # 图片转换工具切换
+│     ├─ styles.css           # CSS 入口文件，仅负责导入模块
+│     └─ styles/              # tokens、布局和各功能页面样式
 ├─ tools/fxxk_file.py         # 启动 FastAPI 服务
 ├─ originals/                 # 上传后的原文件
 ├─ workspace/                 # 文档状态和临时工作数据
@@ -48,7 +53,7 @@ if (value === "new-feature") {
 - 图片只能和图片比较：浏览器支持的图片格式
 - 文档和图片不能混合
 
-文档通过现有 `/api/documents` 上传，再使用 `/api/documents/{id}/preview` 预览；图片使用浏览器 `URL.createObjectURL()` 本地加载，不上传服务器。左右面板的滚动同步由 `bindCompareScroll()` 完成，缩放由 `setCompareZoom()` 完成。
+文档通过现有 `/api/documents` 上传，再使用 `/api/documents/{id}/preview` 预览；图片使用浏览器 `URL.createObjectURL()` 本地加载，不上传服务器。页面逻辑位于 `app/static/scripts/features/compare.js`，左右面板的滚动同步由 `bindCompareScroll()` 完成，缩放由 `setCompareZoom()` 完成。
 
 ## 4. 新增功能的建议步骤
 
@@ -57,8 +62,9 @@ if (value === "new-feature") {
 3. 在 `bindEvents()` 中添加入口、关闭和交互事件。
 4. 为功能增加独立的状态字段，避免复用其他工作区的临时状态。
 5. 如需服务端能力，在 `app/main.py` 增加 `/api/...` 路由；复杂逻辑放入 `app/services/`。
-6. 在 `styles.css` 中使用功能前缀类名，例如 `.export-workspace`，避免覆盖已有翻译和对比样式。
-7. 更新本文件和 `docs/USER_GUIDE.md`，说明用户操作方法。
+6. 在 `styles/` 中为功能创建独立 CSS 文件，并使用功能前缀类名，例如 `.export-workspace`，避免覆盖已有翻译和对比样式。
+7. 页面级 JavaScript 放入 `scripts/features/`，由 `app.js` 负责注入共享状态和编排调用。
+8. 更新本文件和 `docs/USER_GUIDE.md`，说明用户操作方法。
 
 ## 5. 配置与启动
 
