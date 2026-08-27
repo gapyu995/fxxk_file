@@ -16,6 +16,9 @@ const state = {
   translationFontSize: 16,
   sourcePanePercent: 50,
   pendingTranslateAfterSettings: false,
+  markdownFontScale: 1,
+  markdownTableFit: true,
+  markdownObjectUrl: null,
 };
 
 const DISPLAY_PREFERENCES_KEY = "fxxk_file-display-preferences-v1";
@@ -83,6 +86,7 @@ const elements = {
   compareDialog: $("#compareDialog"), closeCompare: $("#closeCompare"), cancelCompare: $("#cancelCompare"), startCompare: $("#startCompare"), compareWorkspace: $("#compareWorkspace"), compareLeft: $("#compareLeft"), compareRight: $("#compareRight"), compareLeftTitle: $("#compareLeftTitle"), compareRightTitle: $("#compareRightTitle"), compareStatus: $("#compareStatus"), compareSync: $("#compareSync"), compareZoomOut: $("#compareZoomOut"), compareZoomIn: $("#compareZoomIn"), compareZoomReset: $("#compareZoomReset"), compareZoomValue: $("#compareZoomValue"), closeCompareWorkspace: $("#closeCompareWorkspace"),
   compareUploadProgress: $("#compareUploadProgress"), compareUploadStatus: $("#compareUploadStatus"), compareUploadPercent: $("#compareUploadPercent"), compareUploadBar: $("#compareUploadBar"),
   imagesWorkspace: $("#imagesWorkspace"), imagesFrame: $("#imagesFrame"), openImagesTool: $("#openImagesTool"), closeImagesWorkspace: $("#closeImagesWorkspace"), imageConvertPngSvg: $("#imageConvertPngSvg"), imageConvertSvgPng: $("#imageConvertSvgPng"),
+  markdownWorkspace: $("#markdownWorkspace"), markdownFileInput: $("#markdownFileInput"), markdownFileMeta: $("#markdownFileMeta"), markdownContent: $("#markdownContent"), markdownEmpty: $("#markdownEmpty"), markdownRendered: $("#markdownRendered"), markdownTocList: $("#markdownTocList"), markdownStatus: $("#markdownStatus"), markdownFullscreen: $("#markdownFullscreen"), markdownFontDown: $("#markdownFontDown"), markdownFontReset: $("#markdownFontReset"), markdownFontUp: $("#markdownFontUp"), markdownFontValue: $("#markdownFontValue"), markdownTableFit: $("#markdownTableFit"),
 };
 
 document.addEventListener("DOMContentLoaded", init);
@@ -95,7 +99,15 @@ async function init() {
     const [settings] = await Promise.all([loadSettings(), loadDocumentList()]);
     state.settings = settings;
     const fromHash = location.hash.replace(/^#\/?/, "");
-    if (/^[a-f0-9]{12}$/.test(fromHash)) await selectDocument(fromHash);
+    if (fromHash === "markdown") {
+      elements.functionSelect.value = "markdown";
+      elements.functionTrigger.firstChild.textContent = "Markdown 查看 ";
+      applyFunctionTheme("markdown");
+      elements.reviewWorkspace.classList.add("hidden");
+      elements.compareWorkspace.classList.add("hidden");
+      elements.imagesWorkspace.classList.add("hidden");
+      elements.markdownWorkspace.classList.remove("hidden");
+    } else if (/^[a-f0-9]{12}$/.test(fromHash)) await selectDocument(fromHash);
   } catch (error) {
     showToast(error.message, true);
   }
@@ -104,6 +116,10 @@ async function init() {
 function bindEvents() {
   elements.fileInput.addEventListener("change", (event) => {
     uploadFiles([...event.target.files]);
+    event.target.value = "";
+  });
+  elements.markdownFileInput.addEventListener("change", (event) => {
+    openMarkdownFiles([...event.target.files]);
     event.target.value = "";
   });
   elements.emptyUpload.addEventListener("click", () => elements.fileInput.click());
@@ -117,6 +133,7 @@ function bindEvents() {
     const value = elements.functionSelect.value;
     elements.compareWorkspace.classList.add("hidden");
     elements.imagesWorkspace.classList.add("hidden");
+    elements.markdownWorkspace.classList.add("hidden");
     if (value === "compare") {
       elements.reviewWorkspace.classList.add("hidden");
       elements.compareWorkspace.classList.remove("hidden");
@@ -124,6 +141,10 @@ function bindEvents() {
     } else if (value === "images") {
       elements.reviewWorkspace.classList.add("hidden");
       elements.imagesWorkspace.classList.remove("hidden");
+    } else if (value === "markdown") {
+      elements.reviewWorkspace.classList.add("hidden");
+      elements.markdownWorkspace.classList.remove("hidden");
+      updateMarkdownLayout();
     } else {
       elements.reviewWorkspace.classList.remove("hidden");
     }
@@ -141,6 +162,11 @@ function bindEvents() {
   elements.startCompare.addEventListener("click", (e) => { e.preventDefault(); startFileCompare(); });
   elements.closeCompareWorkspace.addEventListener("click", () => { elements.compareWorkspace.classList.add("hidden"); elements.reviewWorkspace.classList.remove("hidden"); elements.functionSelect.value="translate"; applyFunctionTheme("translate"); });
   elements.closeImagesWorkspace.addEventListener("click", () => { elements.imagesWorkspace.classList.add("hidden"); elements.reviewWorkspace.classList.remove("hidden"); elements.functionSelect.value="translate"; applyFunctionTheme("translate"); });
+  elements.markdownFullscreen.addEventListener("click", toggleMarkdownFullscreen);
+  elements.markdownFontDown.addEventListener("click", () => setMarkdownFontScale(state.markdownFontScale - 0.1));
+  elements.markdownFontUp.addEventListener("click", () => setMarkdownFontScale(state.markdownFontScale + 0.1));
+  elements.markdownFontReset.addEventListener("click", () => setMarkdownFontScale(1));
+  elements.markdownTableFit.addEventListener("click", toggleMarkdownTableFit);
   elements.imageConvertPngSvg.addEventListener("click", () => switchImagesTool("png-to-svg"));
   elements.imageConvertSvgPng.addEventListener("click", () => switchImagesTool("svg-to-png"));
   elements.openImagesTool.addEventListener("click", () => window.open(elements.imagesFrame.src, "_blank"));
@@ -168,6 +194,7 @@ function bindEvents() {
   window.addEventListener("resize", () => {
     fitSourcePaneToViewport();
     scheduleTranslationLayout();
+    updateMarkdownLayout();
   });
 
   for (const target of [document.body, elements.dropzone]) {
@@ -183,7 +210,7 @@ function bindEvents() {
     event.preventDefault();
     state.dragDepth += 1;
     elements.uploadOverlay.querySelector("strong").textContent =
-      elements.functionSelect.value === "compare" ? "松开即可开始对比" : "松开即可导入并翻译";
+      elements.functionSelect.value === "compare" ? "松开即可开始对比" : elements.functionSelect.value === "markdown" ? "松开即可打开 Markdown" : "松开即可导入并翻译";
     elements.uploadOverlay.classList.remove("hidden");
   });
   document.body.addEventListener("dragleave", (event) => {
@@ -200,6 +227,8 @@ function bindEvents() {
     const files = [...event.dataTransfer.files];
     if (elements.functionSelect.value === "compare") {
       runFileCompare(files);
+    } else if (elements.functionSelect.value === "markdown") {
+      openMarkdownFiles(files);
     } else {
       uploadFiles(files);
     }
@@ -210,7 +239,8 @@ function bindEvents() {
 function applyFunctionTheme(value) {
   document.body.classList.toggle("compare-theme", value === "compare");
   document.body.classList.toggle("images-theme", value === "images");
-  document.body.classList.toggle("translate-theme", value !== "compare" && value !== "images");
+  document.body.classList.toggle("markdown-theme", value === "markdown");
+  document.body.classList.toggle("translate-theme", value !== "compare" && value !== "images" && value !== "markdown");
 }
 
 function switchImagesTool(tool) {
@@ -1641,3 +1671,290 @@ function showToast(message, isError, duration) {
   elements.toast.classList.remove("hidden");
   state.toastTimer = setTimeout(() => elements.toast.classList.add("hidden"), duration || (isError ? 7000 : 3500));
 }
+
+// Markdown viewer ---------------------------------------------------------
+function isMarkdownFile(file) {
+  return Boolean(file && /\.(md|markdown|mdown|mkdn|txt)$/i.test(file.name || ""));
+}
+
+async function openMarkdownFiles(files) {
+  const file = (files || []).find(isMarkdownFile);
+  if (!file) {
+    showToast("请选择 .md、.markdown 或 .txt 文件。", true);
+    return;
+  }
+  if (elements.functionSelect.value !== "markdown") {
+    elements.functionSelect.value = "markdown";
+    elements.functionTrigger.firstChild.textContent = "Markdown 查看 ";
+    applyFunctionTheme("markdown");
+    elements.reviewWorkspace.classList.add("hidden");
+    elements.compareWorkspace.classList.add("hidden");
+    elements.imagesWorkspace.classList.add("hidden");
+    elements.markdownWorkspace.classList.remove("hidden");
+  }
+  try {
+    elements.markdownStatus.textContent = "正在读取文件…";
+    const source = await file.text();
+    state.markdownFileName = file.name;
+    renderMarkdownDocument(source, file);
+  } catch (error) {
+    elements.markdownStatus.textContent = "文件读取失败";
+    showToast(`Markdown 文件读取失败：${error.message || error}`, true);
+  }
+}
+
+function renderMarkdownDocument(source, file) {
+  const parsed = markdownToHtml(source);
+  elements.markdownRendered.innerHTML = parsed.html;
+  elements.markdownRendered.classList.remove("hidden");
+  elements.markdownEmpty.classList.add("hidden");
+  elements.markdownFileMeta.textContent = `${file.name} · ${formatMarkdownBytes(file.size)} · ${parsed.lineCount} 行`;
+  elements.markdownStatus.textContent = `${parsed.wordCount.toLocaleString()} 个字符 · ${parsed.headingCount} 个标题 · ${parsed.tableCount} 个表格`;
+  renderMarkdownToc(parsed.toc);
+  setMarkdownFontScale(state.markdownFontScale, false);
+  updateMarkdownLayout();
+}
+
+function formatMarkdownBytes(bytes) {
+  const value = Number(bytes) || 0;
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function escapeMarkdownHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+}
+
+function safeMarkdownUrl(value) {
+  const url = String(value || "").trim();
+  if (/^(https?:|mailto:|#|\/|data:image\/(?:png|jpeg|gif|webp);)/i.test(url)) return url;
+  return "#";
+}
+
+function markdownInline(value) {
+  let output = escapeMarkdownHtml(value);
+  const tokens = [];
+  const token = (html) => {
+    const marker = `\u0000MD${tokens.length}\u0000`;
+    tokens.push(html);
+    return marker;
+  };
+  output = output.replace(/!\[([^\]]*)\]\((\S+?)(?:\s+["']([^"']*)["'])?\)/g, (_, alt, url, title) => {
+    const safeUrl = safeMarkdownUrl(url);
+    if (safeUrl === "#") return escapeMarkdownHtml(alt || "图片");
+    const titleAttr = title ? ` title="${escapeMarkdownHtml(title)}"` : "";
+    return token(`<img src="${escapeMarkdownHtml(safeUrl)}" alt="${escapeMarkdownHtml(alt)}"${titleAttr} loading="lazy">`);
+  });
+  output = output.replace(/\[([^\]]+)\]\((\S+?)(?:\s+["']([^"']*)["'])?\)/g, (_, label, url, title) => {
+    const safeUrl = safeMarkdownUrl(url);
+    if (safeUrl === "#") return label;
+    const titleAttr = title ? ` title="${escapeMarkdownHtml(title)}"` : "";
+    return token(`<a href="${escapeMarkdownHtml(safeUrl)}" target="_blank" rel="noopener noreferrer"${titleAttr}>${label}</a>`);
+  });
+  output = output.replace(/`([^`\n]+)`/g, (_, code) => token(`<code>${code}</code>`));
+  output = output.replace(/\*\*([^*\n]+)\*\*|__([^_\n]+)__/g, (_, boldA, boldB) => `<strong>${boldA || boldB}</strong>`);
+  output = output.replace(/~~([^~\n]+)~~/g, "<del>$1</del>");
+  output = output.replace(/\*([^*\n]+)\*|_([^_\n]+)_/g, (_, italicA, italicB) => `<em>${italicA || italicB}</em>`);
+  output = output.replace(/(^|\s)(https?:\/\/[^\s<]+)/g, (_, prefix, url) => `${prefix}${token(`<a href="${escapeMarkdownHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeMarkdownHtml(url)}</a>`)}`);
+  return output.replace(/\u0000MD(\d+)\u0000/g, (_, index) => tokens[Number(index)] || "");
+}
+
+function splitMarkdownTableRow(line) {
+  let value = String(line || "").trim();
+  if (value.startsWith("|")) value = value.slice(1);
+  if (value.endsWith("|")) value = value.slice(0, -1);
+  const cells = [];
+  let current = "";
+  let escaped = false;
+  for (const char of value) {
+    if (char === "|" && !escaped) {
+      cells.push(current.trim().replace(/\\\|/g, "|"));
+      current = "";
+      continue;
+    }
+    if (char === "\\" && !escaped) { escaped = true; current += char; continue; }
+    escaped = false;
+    current += char;
+  }
+  cells.push(current.trim().replace(/\\\|/g, "|"));
+  return cells;
+}
+
+function isMarkdownTableSeparator(line) {
+  const cells = splitMarkdownTableRow(line);
+  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell.trim()));
+}
+
+function renderMarkdownTable(headerLine, separatorLine, rowLines) {
+  const headers = splitMarkdownTableRow(headerLine);
+  const separators = splitMarkdownTableRow(separatorLine);
+  const alignments = headers.map((_, index) => {
+    const cell = separators[index] || "";
+    return cell.startsWith(":") && cell.endsWith(":") ? "center" : cell.startsWith(":") ? "left" : cell.endsWith(":") ? "right" : "";
+  });
+  const head = headers.map((cell, index) => `<th${alignments[index] ? ` style="text-align:${alignments[index]}"` : ""}>${markdownInline(cell)}</th>`).join("");
+  const rows = rowLines.map((line) => {
+    const cells = splitMarkdownTableRow(line);
+    while (cells.length < headers.length) cells.push("");
+    return `<tr>${headers.map((_, index) => `<td${alignments[index] ? ` style="text-align:${alignments[index]}"` : ""}>${markdownInline(cells[index] || "")}</td>`).join("")}</tr>`;
+  }).join("");
+  const rowCount = rowLines.length;
+  return `<div class="markdown-table-wrap" data-row-count="${rowCount}" data-column-count="${headers.length}"><div class="markdown-table-caption"><span>表格</span><span>${rowCount} 行 · ${headers.length} 列</span></div><table aria-rowcount="${rowCount + 1}"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function markdownToHtml(source) {
+  const lines = String(source || "").replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n");
+  const toc = [];
+  let html = "";
+  let headingCount = 0;
+  let tableCount = 0;
+  let wordCount = 0;
+  let i = 0;
+  const blockStart = (line, next) => /^(?:#{1,6}\s|```|~~~|>|[-*+]\s+|\d+[.)]\s+|---+\s*$|\*\*\*+\s*$)/.test(line) || (next && isMarkdownTableSeparator(next));
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    if (!trimmed) { i += 1; continue; }
+    const fence = trimmed.match(/^(```+|~~~+)\s*([\w-]*)\s*$/);
+    if (fence) {
+      const marker = fence[1][0];
+      const codeLines = [];
+      i += 1;
+      while (i < lines.length && !lines[i].trim().startsWith(marker.repeat(fence[1].length))) { codeLines.push(lines[i]); i += 1; }
+      if (i < lines.length) i += 1;
+      const language = fence[2] ? ` class="language-${escapeMarkdownHtml(fence[2])}"` : "";
+      html += `<pre><code${language}>${escapeMarkdownHtml(codeLines.join("\n"))}</code></pre>`;
+      continue;
+    }
+    const heading = line.match(/^\s*(#{1,6})\s+(.+?)\s*#*\s*$/);
+    if (heading) {
+      const level = heading[1].length;
+      const text = heading[2].trim();
+      const id = `markdown-heading-${toc.length + 1}`;
+      toc.push({ id, level, text: text.replace(/[`*_~]/g, "") });
+      headingCount += 1;
+      html += `<h${level} id="${id}">${markdownInline(text)}</h${level}>`;
+      i += 1;
+      continue;
+    }
+    if (/^\s*(?:---+|\*\*\*+|___+)\s*$/.test(line)) { html += "<hr>"; i += 1; continue; }
+    if (i + 1 < lines.length && line.includes("|") && isMarkdownTableSeparator(lines[i + 1])) {
+      const separatorLine = lines[i + 1];
+      const rowLines = [];
+      i += 2;
+      while (i < lines.length && lines[i].trim() && lines[i].includes("|")) { rowLines.push(lines[i]); i += 1; }
+      html += renderMarkdownTable(line, separatorLine, rowLines);
+      tableCount += 1;
+      continue;
+    }
+    if (/^\s*>/.test(line)) {
+      const quoteLines = [];
+      while (i < lines.length && /^\s*>/.test(lines[i])) { quoteLines.push(lines[i].replace(/^\s*>\s?/, "")); i += 1; }
+      html += `<blockquote>${quoteLines.map(markdownInline).join("<br>")}</blockquote>`;
+      continue;
+    }
+    const listMatch = line.match(/^\s*([-*+] |\d+[.)]\s+)/);
+    if (listMatch) {
+      const ordered = /^\s*\d/.test(line);
+      const items = [];
+      while (i < lines.length) {
+        const match = lines[i].match(/^\s*(?:[-*+] |\d+[.)]\s+)(.*)$/);
+        if (!match || (/^\s*\d/.test(lines[i]) !== ordered)) break;
+        let itemText = match[1];
+        const task = itemText.match(/^\[([ xX])\]\s+(.*)$/);
+        if (task) items.push(`<li class="task-item"><input type="checkbox" disabled${task[1].toLowerCase() === "x" ? " checked" : ""}>${markdownInline(task[2])}</li>`);
+        else items.push(`<li>${markdownInline(itemText)}</li>`);
+        i += 1;
+      }
+      html += `<${ordered ? "ol" : "ul"}>${items.join("")}</${ordered ? "ol" : "ul"}>`;
+      continue;
+    }
+    const paragraph = [line];
+    i += 1;
+    while (i < lines.length && lines[i].trim() && !blockStart(lines[i], lines[i + 1])) { paragraph.push(lines[i]); i += 1; }
+    html += `<p>${paragraph.map(markdownInline).join("<br>")}</p>`;
+  }
+  wordCount = String(source || "").replace(/\s/g, "").length;
+  return { html, toc, headingCount, tableCount, wordCount, lineCount: lines.length };
+}
+
+function renderMarkdownToc(toc) {
+  elements.markdownTocList.replaceChildren();
+  if (!toc.length) {
+    elements.markdownTocList.innerHTML = '<span class="markdown-toc-empty">文档中没有标题</span>';
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+  toc.forEach((item) => {
+    const link = document.createElement("a");
+    link.href = `#${item.id}`;
+    link.textContent = item.text;
+    link.className = `toc-level-${Math.min(3, item.level)}`;
+    link.dataset.target = item.id;
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    fragment.append(link);
+  });
+  elements.markdownTocList.append(fragment);
+}
+
+function setMarkdownFontScale(value, persist = true) {
+  state.markdownFontScale = Math.max(0.8, Math.min(1.4, Math.round((Number(value) || 1) * 10) / 10));
+  elements.markdownRendered.style.setProperty("--md-scale", String(state.markdownFontScale));
+  elements.markdownFontValue.textContent = `${Math.round(state.markdownFontScale * 100)}%`;
+  elements.markdownFontDown.disabled = state.markdownFontScale <= 0.8;
+  elements.markdownFontUp.disabled = state.markdownFontScale >= 1.4;
+  if (persist) updateMarkdownLayout();
+}
+
+function toggleMarkdownTableFit() {
+  state.markdownTableFit = !state.markdownTableFit;
+  elements.markdownTableFit.classList.toggle("active", state.markdownTableFit);
+  elements.markdownTableFit.setAttribute("aria-pressed", String(state.markdownTableFit));
+  updateMarkdownLayout();
+}
+
+function updateMarkdownLayout() {
+  if (!elements.markdownRendered || elements.markdownRendered.classList.contains("hidden")) return;
+  const available = elements.markdownContent?.clientWidth || 0;
+  elements.markdownRendered.querySelectorAll(".markdown-table-wrap").forEach((wrap) => {
+    const table = wrap.querySelector("table");
+    if (!table) return;
+    const columns = Number(wrap.dataset.columnCount || table.querySelectorAll("thead th").length || 0);
+    const wide = columns >= 6 || (columns >= 5 && available < 700);
+    wrap.classList.toggle("wide-table", wide);
+    wrap.classList.toggle("no-fit", !state.markdownTableFit);
+    wrap.classList.toggle("compact", state.markdownTableFit && available < 760);
+    table.setAttribute("data-auto-rows", state.markdownTableFit ? "true" : "false");
+  });
+}
+
+async function toggleMarkdownFullscreen() {
+  const workspace = elements.markdownWorkspace;
+  if (!workspace) return;
+  try {
+    if (document.fullscreenElement === workspace) await document.exitFullscreen();
+    else if (workspace.requestFullscreen) await workspace.requestFullscreen();
+    else throw new Error("fullscreen unavailable");
+  } catch (_) {
+    workspace.classList.toggle("fullscreen-fallback");
+    updateMarkdownFullscreenButton();
+  }
+}
+
+function updateMarkdownFullscreenButton() {
+  const active = document.fullscreenElement === elements.markdownWorkspace || elements.markdownWorkspace.classList.contains("fullscreen-fallback");
+  elements.markdownFullscreen.textContent = active ? "退出全屏" : "全屏查看";
+  elements.markdownFullscreen.setAttribute("aria-pressed", String(active));
+}
+
+document.addEventListener("fullscreenchange", updateMarkdownFullscreenButton);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && elements.markdownWorkspace?.classList.contains("fullscreen-fallback")) {
+    elements.markdownWorkspace.classList.remove("fullscreen-fallback");
+    updateMarkdownFullscreenButton();
+  }
+});

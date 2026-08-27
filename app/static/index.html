@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
     <title>fxxk_file · 多功能文档工作台</title>
-    <link rel="stylesheet" href="/styles.css?v=20260819-7" />
+    <link rel="stylesheet" href="/styles.css?v=20260827-markdown" />
   </head>
   <body>
     <div class="app-shell">
@@ -18,7 +18,7 @@
           </div>
         </div>
         <div class="top-actions">
-          <div class="function-menu" id="functionMenu"><span class="function-icon">✦</span><span class="function-label">功能</span><button id="functionTrigger" class="function-trigger" type="button">文档翻译 <span>⌄</span></button><div id="functionOptions" class="function-options"><button type="button" data-value="translate">文档翻译</button><button type="button" data-value="compare">双文件对比</button><button type="button" data-value="images">图片转换</button></div><select id="functionSelect" hidden><option value="translate">文档翻译</option><option value="compare">双文件对比</option><option value="images">图片转换</option></select></div>
+          <div class="function-menu" id="functionMenu"><span class="function-icon">✦</span><span class="function-label">功能</span><button id="functionTrigger" class="function-trigger" type="button">文档翻译 <span>⌄</span></button><div id="functionOptions" class="function-options"><button type="button" data-value="translate">文档翻译</button><button type="button" data-value="compare">双文件对比</button><button type="button" data-value="images">图片转换</button><button type="button" data-value="markdown">Markdown 查看</button></div><select id="functionSelect" hidden><option value="translate">文档翻译</option><option value="compare">双文件对比</option><option value="images">图片转换</option><option value="markdown">Markdown 查看</option></select></div>
           <span id="saveState" class="save-state">已保存</span>
           <button id="settingsButton" class="button subtle" type="button"><span class="dot" id="configDot"></span>模型设置</button>
         </div>
@@ -72,6 +72,19 @@
               <li>SVG 转 PNG 建议导出 2 倍以上尺寸，效果更清晰。</li>
               <li>白色背景的 Logo 可开启「移除背景色」。</li>
               <li>可直接把文件拖进右侧工具，或粘贴 SVG 代码。</li>
+            </ul>
+          </div>
+
+          <div class="sidebar-panel" data-sidebar="markdown">
+            <div class="sidebar-note intro">
+              <strong>Markdown 查看</strong>
+              <p>在浏览器本地打开 Markdown 文件，支持响应式排版、代码高亮样式和可滚动表格。</p>
+            </div>
+            <div class="sidebar-heading"><span>使用提示</span></div>
+            <ul class="sidebar-tips">
+              <li>支持 .md、.markdown 和 .txt 文件。</li>
+              <li>表格会根据屏幕宽度自动换行或横向滚动。</li>
+              <li>点击右上角全屏按钮，获得沉浸式阅读体验。</li>
             </ul>
           </div>
         </aside>
@@ -225,11 +238,47 @@
       <iframe id="imagesFrame" class="images-frame" src="/tools/image-convert/png-to-svg.html" title="图片转换工具"></iframe>
     </section>
 
+    <section id="markdownWorkspace" class="markdown-workspace hidden" aria-label="Markdown 查看器">
+      <div class="markdown-toolbar">
+        <div class="markdown-toolbar-title">
+          <span class="markdown-mark">M↓</span>
+          <div><strong>Markdown 查看器</strong><span id="markdownFileMeta">选择一个文件开始阅读</span></div>
+        </div>
+        <div class="markdown-toolbar-actions">
+          <label class="markdown-open-button button primary" for="markdownFileInput">打开 Markdown<input id="markdownFileInput" type="file" accept=".md,.markdown,.mdown,.mkdn,.txt,text/markdown,text/plain" hidden /></label>
+          <div class="markdown-control-group" role="group" aria-label="文字大小">
+            <button id="markdownFontDown" type="button" title="缩小文字">A−</button>
+            <button id="markdownFontReset" type="button" title="恢复默认文字大小"><b id="markdownFontValue">100%</b></button>
+            <button id="markdownFontUp" type="button" title="放大文字">A＋</button>
+          </div>
+          <button id="markdownTableFit" class="button markdown-toggle active" type="button" aria-pressed="true" title="让表格根据容器宽度自动调整">表格自适应</button>
+          <button id="markdownFullscreen" class="button" type="button" title="全屏查看 Markdown">全屏查看</button>
+        </div>
+      </div>
+      <div class="markdown-body-wrap">
+        <aside id="markdownToc" class="markdown-toc" aria-label="文档目录">
+          <div class="markdown-toc-heading">目录</div>
+          <div id="markdownTocList" class="markdown-toc-list"><span class="markdown-toc-empty">打开文件后显示目录</span></div>
+        </aside>
+        <main id="markdownContent" class="markdown-content">
+          <div id="markdownEmpty" class="markdown-empty-state">
+            <div class="markdown-empty-icon">#</div>
+            <h1>把 Markdown 变成舒适的阅读页面</h1>
+            <p>拖入 .md 文件，或点击上方按钮选择文件。内容只在本地浏览器中读取，不会上传。</p>
+            <label class="button primary" for="markdownFileInput">选择 Markdown 文件</label>
+            <div class="markdown-empty-features"><span>↔ 响应式排版</span><span>▦ 表格自适应</span><span>⛶ 全屏阅读</span></div>
+          </div>
+          <article id="markdownRendered" class="markdown-rendered hidden"></article>
+        </main>
+      </div>
+      <div id="markdownStatus" class="markdown-status" aria-live="polite">等待打开文件</div>
+    </section>
+
     <div id="uploadOverlay" class="upload-overlay hidden">
       <div><span>＋</span><strong>松开即可导入并翻译</strong></div>
     </div>
     <div id="toast" class="toast hidden"></div>
     <script src="/vendor/pdf.min.js"></script>
-    <script src="/app.js?v=20260819-5" defer></script>
+    <script src="/app.js?v=20260827-markdown" defer></script>
   </body>
 </html>
