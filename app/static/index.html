@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
     <title>fxxk_file · 多功能文档工作台</title>
-    <link rel="stylesheet" href="/styles.css?v=20260819-6" />
+    <link rel="stylesheet" href="/styles.css?v=20260819-7" />
   </head>
   <body>
     <div class="app-shell">
@@ -26,23 +26,53 @@
 
       <div class="body-layout">
         <aside class="sidebar">
-          <label id="dropzone" class="dropzone" for="fileInput">
-            <input id="fileInput" type="file" accept=".doc,.docx,.pdf" multiple hidden />
-            <span class="upload-icon">＋</span>
-            <strong>拖入待翻译文档</strong>
-            <span>DOC · DOCX · PDF</span>
-          </label>
-          <label class="auto-translate"><input id="autoTranslate" type="checkbox" checked /> 上传后立即翻译</label>
+          <div class="sidebar-panel" data-sidebar="translate">
+            <label id="dropzone" class="dropzone" for="fileInput">
+              <input id="fileInput" type="file" accept=".doc,.docx,.pdf" multiple hidden />
+              <span class="upload-icon">＋</span>
+              <strong>拖入待翻译文档</strong>
+              <span>DOC · DOCX · PDF</span>
+            </label>
+            <label class="auto-translate"><input id="autoTranslate" type="checkbox" checked /> 上传后立即翻译</label>
 
-          <div class="sidebar-heading">
-            <span>最近文档</span>
-            <button id="refreshList" class="icon-button" title="刷新" type="button">↻</button>
+            <div class="sidebar-heading">
+              <span>最近文档</span>
+              <button id="refreshList" class="icon-button" title="刷新" type="button">↻</button>
+            </div>
+            <nav id="documentList" class="document-list"></nav>
+
+            <div class="sidebar-note">
+              <strong>术语与规范</strong>
+              <p>将 CSV、TSV 或 JSON 术语表放入 <code>glossaries</code>，下一批翻译会自动应用。</p>
+            </div>
           </div>
-          <nav id="documentList" class="document-list"></nav>
 
-          <div class="sidebar-note">
-            <strong>术语与规范</strong>
-            <p>将 CSV、TSV 或 JSON 术语表放入 <code>glossaries</code>，下一批翻译会自动应用。</p>
+          <div class="sidebar-panel" data-sidebar="compare">
+            <div class="sidebar-note intro">
+              <strong>双文件对比</strong>
+              <p>将两份同类型文件拖入右侧对比区，左右按页同步滚动，适合核对不同版本的差异。</p>
+            </div>
+            <div class="sidebar-heading"><span>操作提示</span></div>
+            <ul class="sidebar-tips">
+              <li>文档与文档、图片与图片才能配对对比，不能混选。</li>
+              <li>开启「同步滚动」后左右页面联动。</li>
+              <li>图片对比按住右键拖动可平移，缩放范围 50%–300%。</li>
+              <li>对比为只读查看，不会改动原文件。</li>
+            </ul>
+          </div>
+
+          <div class="sidebar-panel" data-sidebar="images">
+            <div class="sidebar-note intro">
+              <strong>图片转换</strong>
+              <p>PNG → SVG 矢量化与 SVG → PNG 光栅化，全程在本机浏览器完成，图片不会上传到服务器。</p>
+            </div>
+            <div class="sidebar-heading"><span>使用提示</span></div>
+            <ul class="sidebar-tips">
+              <li>图标 / Logo 用「色块轮廓」，线稿用「线段中心线」。</li>
+              <li>SVG 转 PNG 建议导出 2 倍以上尺寸，效果更清晰。</li>
+              <li>白色背景的 Logo 可开启「移除背景色」。</li>
+              <li>可直接把文件拖进右侧工具，或粘贴 SVG 代码。</li>
+            </ul>
           </div>
         </aside>
 
