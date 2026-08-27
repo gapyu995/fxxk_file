@@ -224,8 +224,22 @@
       const cells = [];
       let current = "";
       let escaped = false;
-      for (const char of value) {
-        if (char === "|" && !escaped) {
+      let codeSpanLength = 0;
+      for (let index = 0; index < value.length; index += 1) {
+        const char = value[index];
+        // A pipe inside inline code is content, not a column boundary. This
+        // is common in command examples such as `` `a|b` `` and used to make
+        // otherwise valid tables appear malformed.
+        if (char === "`" && !escaped) {
+          let runLength = 1;
+          while (value[index + runLength] === "`") runLength += 1;
+          if (!codeSpanLength) codeSpanLength = runLength;
+          else if (codeSpanLength === runLength) codeSpanLength = 0;
+          current += "`".repeat(runLength);
+          index += runLength - 1;
+          continue;
+        }
+        if (char === "|" && !escaped && !codeSpanLength) {
           cells.push(current.trim().replace(/\\\|/g, "|"));
           current = "";
           continue;
@@ -240,7 +254,27 @@
 
     function isMarkdownTableSeparator(line) {
       const cells = splitMarkdownTableRow(line);
-      return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell.trim()));
+      // Accept short (two-dash) delimiters and whitespace around alignment
+      // colons so hand-written tables are not silently downgraded to prose.
+      return cells.length > 0 && cells.every((cell) => /^:?\s*-{2,}\s*:?$/.test(cell.trim()));
+    }
+
+    function findMarkdownTableSeparatorIndex(lines, headerIndex) {
+      const headerLine = lines[headerIndex];
+      if (!headerLine || !headerLine.includes("|")) return -1;
+      let separatorIndex = headerIndex + 1;
+      // A blank line between the header and delimiter is tolerated by a
+      // number of Markdown renderers. Only skip one line to avoid consuming
+      // unrelated content.
+      if (separatorIndex < lines.length && !lines[separatorIndex].trim()) separatorIndex += 1;
+      const separatorLine = lines[separatorIndex];
+      if (!separatorLine || !separatorLine.includes("|")) return -1;
+      if (!isMarkdownTableSeparator(separatorLine)) return -1;
+      const headerColumns = splitMarkdownTableRow(headerLine).length;
+      // Delimiter/header column counts are intentionally not required to
+      // match. Real-world hand-written tables often omit a trailing delimiter
+      // cell; missing alignment metadata simply falls back to default styling.
+      return headerColumns >= 1 ? separatorIndex : -1;
     }
 
     function renderMarkdownTable(headerLine, separatorLine, rowLines) {
@@ -268,7 +302,11 @@
       let tableCount = 0;
       let wordCount = 0;
       let i = 0;
-      const blockStart = (line, next) => /^(?:#{1,6}\s|```|~~~|>|[-*+]\s+|\d+[.)]\s+|---+\s*$|\*\*\*+\s*$)/.test(line) || (next && isMarkdownTableSeparator(next));
+      const blockStart = (index) => {
+        const line = lines[index];
+        return /^(?:#{1,6}\s|```|~~~|>|[-*+]\s+|\d+[.)]\s+|---+\s*$|\*\*\*+\s*$)/.test(line)
+          || findMarkdownTableSeparatorIndex(lines, index) !== -1;
+      };
       while (i < lines.length) {
         const line = lines[i];
         const trimmed = line.trim();
@@ -296,10 +334,11 @@
           continue;
         }
         if (/^\s*(?:---+|\*\*\*+|___+)\s*$/.test(line)) { html += "<hr>"; i += 1; continue; }
-        if (i + 1 < lines.length && line.includes("|") && isMarkdownTableSeparator(lines[i + 1])) {
-          const separatorLine = lines[i + 1];
+        const separatorIndex = findMarkdownTableSeparatorIndex(lines, i);
+        if (separatorIndex !== -1) {
+          const separatorLine = lines[separatorIndex];
           const rowLines = [];
-          i += 2;
+          i = separatorIndex + 1;
           while (i < lines.length && lines[i].trim() && lines[i].includes("|")) { rowLines.push(lines[i]); i += 1; }
           html += renderMarkdownTable(line, separatorLine, rowLines);
           tableCount += 1;
@@ -329,7 +368,7 @@
         }
         const paragraph = [line];
         i += 1;
-        while (i < lines.length && lines[i].trim() && !blockStart(lines[i], lines[i + 1])) { paragraph.push(lines[i]); i += 1; }
+        while (i < lines.length && lines[i].trim() && !blockStart(i)) { paragraph.push(lines[i]); i += 1; }
         html += `<p>${renderMarkdownParagraph(paragraph)}</p>`;
       }
       wordCount = String(source || "").replace(/\s/g, "").length;
