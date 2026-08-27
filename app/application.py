@@ -33,7 +33,7 @@ async def lifespan(_: FastAPI):
 
 def create_app() -> FastAPI:
     """Build the HTTP application with all routers and static resources."""
-    application = FastAPI(title="fxxk_file", version="1.5.0", lifespan=lifespan)
+    application = FastAPI(title="fxxk_file", version="1.6.1", lifespan=lifespan)
     application.include_router(system.router)
     application.include_router(documents.router)
     application.include_router(translation.router)

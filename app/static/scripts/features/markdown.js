@@ -458,7 +458,7 @@
       updateLayout: updateMarkdownLayout,
       updateStickyHeading: updateMarkdownStickyHeading,
       toggleFullscreen: toggleMarkdownFullscreen,
-      updateFullscreenButton,
+      updateFullscreenButton: updateMarkdownFullscreenButton,
     };
   }
 

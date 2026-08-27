@@ -1,9 +1,9 @@
 /* CSS entrypoint. Keep page styles isolated in the files below. */
-@import url("/styles/tokens.css?v=20260827-structured");
-@import url("/styles/base.css?v=20260827-structured");
-@import url("/styles/layout.css?v=20260827-structured");
-@import url("/styles/translate.css?v=20260827-structured");
-@import url("/styles/compare.css?v=20260827-structured");
-@import url("/styles/images.css?v=20260827-structured");
-@import url("/styles/markdown.css?v=20260827-structured");
-@import url("/styles/responsive.css?v=20260827-structured");
+@import url("/styles/tokens.css?v=20260827-frontend-fix");
+@import url("/styles/base.css?v=20260827-frontend-fix");
+@import url("/styles/layout.css?v=20260827-frontend-fix");
+@import url("/styles/translate.css?v=20260827-frontend-fix");
+@import url("/styles/compare.css?v=20260827-frontend-fix");
+@import url("/styles/images.css?v=20260827-frontend-fix");
+@import url("/styles/markdown.css?v=20260827-frontend-fix");
+@import url("/styles/responsive.css?v=20260827-frontend-fix");

@@ -25,6 +25,29 @@ jobs:
       - name: Compile backend
         run: python -m compileall -q app tools
 
+      - name: Check frontend JavaScript syntax
+        run: |
+          node --check app/static/app.js
+          node --check app/static/scripts/features/compare.js
+          node --check app/static/scripts/features/images.js
+          node --check app/static/scripts/features/markdown.js
+
+      - name: Check frontend DOM references
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          html = Path("app/static/index.html").read_text(encoding="utf-8")
+          js = Path("app/static/app.js").read_text(encoding="utf-8")
+          ids = set(re.findall(r'id=["\']([^"\']+)', html))
+          refs = set(re.findall(r'\$\(["\']#([^"\']+)', js))
+          missing = refs - ids
+          if missing:
+              raise SystemExit(f"missing DOM ids: {sorted(missing)}")
+          print(f"validated {len(ids)} DOM ids")
+          PY
+
       - name: Import application and inspect routes
         run: |
           python - <<'PY'
