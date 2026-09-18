@@ -13,6 +13,7 @@ import httpx
 
 from app.config import Settings
 from app.services.glossary import Term
+from app.services.text_normalize import effective_mode, normalize_translation
 
 
 LANGUAGE_NAMES = {"zh": "Simplified Chinese", "en": "English"}
@@ -47,7 +48,7 @@ async def translate_batch(
     if not settings.translation_configured:
         raise TranslationError("尚未配置翻译模型。请点击右上角“模型设置”。")
 
-    system_prompt = _system_prompt(source_lang, target_lang, terms, style_guide)
+    system_prompt = _system_prompt(source_lang, target_lang, terms, style_guide, settings.zh_script_mode)
     endpoint = build_endpoint(settings.base_url, settings.protocol)
     payload, headers = _build_request(settings, system_prompt, items)
     last_error = ""
@@ -71,7 +72,11 @@ async def translate_batch(
             if not expected.issubset(parsed):
                 missing = ", ".join(sorted(expected - parsed))
                 raise TranslationError(f"模型响应缺少段落：{missing}")
-            return {key: parsed[key] for key in expected}
+            mode = getattr(settings, "zh_script_mode", "auto")
+            return {
+                key: normalize_translation(parsed[key], target_lang, mode)
+                for key in expected
+            }
         except asyncio.CancelledError:
             raise
         except _PermanentTranslationError as exc:
@@ -195,7 +200,13 @@ def _response_text(data: dict, protocol: str) -> str:
     return str(content)
 
 
-def _system_prompt(source_lang: str, target_lang: str, terms: list[Term], style_guide: str) -> str:
+def _system_prompt(
+    source_lang: str,
+    target_lang: str,
+    terms: list[Term],
+    style_guide: str,
+    zh_script_mode: str = "auto",
+) -> str:
     source = LANGUAGE_NAMES.get(source_lang, source_lang)
     target = LANGUAGE_NAMES.get(target_lang, target_lang)
     term_lines = []
@@ -204,6 +215,13 @@ def _system_prompt(source_lang: str, target_lang: str, terms: list[Term], style_
         term_lines.append(f"- {term.source} => {term.target}" + (f" ({extras})" if extras else ""))
     terminology = "\n".join(term_lines) if term_lines else "(No matching mandatory terms.)"
     style = style_guide or "Use a professional, clear register appropriate to the source document."
+    script_note = ""
+    if target_lang == "zh":
+        resolved = effective_mode(zh_script_mode, target_lang)
+        if resolved == "traditional":
+            script_note = "\n6. Write the Chinese output in Traditional Chinese characters."
+        elif resolved == "simplified":
+            script_note = "\n6. Write the Chinese output in Simplified Chinese characters."
     return f"""You are a senior professional translator. Translate from {source} to {target}.
 
 Rules:
@@ -212,7 +230,7 @@ Rules:
 3. Do not add explanations, commentary, quotation marks, or omitted-content markers.
 4. Translate each segment independently but keep wording consistent across the batch.
 5. Return only a JSON object in this exact shape:
-{{"translations":[{{"id":"segment id","text":"translated text"}}]}}
+{{"translations":[{{"id":"segment id","text":"translated text"}}]}}{script_note}
 
 Mandatory terminology:
 {terminology}

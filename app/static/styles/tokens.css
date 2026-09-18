@@ -1,23 +1,352 @@
-/* Design tokens shared by every workspace. */
+/* Design tokens — three layers, two themes.
+ *
+ *   (1) static scales   --static-*   raw colours; the only place a hex lives
+ *   (2) semantic aliases --color-*   the ONLY layer a component may reference
+ *   (3) geometry         --space/--radius/--text/--motion
+ *
+ * Light is DeepSeek Harness native; dark is the Ellen skin. Swapping a theme
+ * overwrites layer 1 only, so no component rule changes between the four
+ * combinations (native/ellen x light/dark).
+ *
+ * See docs/DESIGN.md for why each value was chosen and where it may be used.
+ */
 
 :root {
-  --ink: #18201d;
-  --muted: #66716c;
-  --line: #dfe5e1;
-  --line-soft: #edf0ee;
-  --paper: #ffffff;
-  --canvas: #f5f7f5;
-  --green: #166a4b;
-  --green-dark: #0d5038;
-  --green-soft: #e8f3ed;
-  --amber: #9a6011;
-  --amber-soft: #fff3dc;
-  --red: #a13a35;
-  --red-soft: #fdeceb;
-  --shadow: 0 16px 42px rgba(27, 49, 39, 0.1);
+  /* ---- (1) Static scales ------------------------------------------------
+   *
+   * A palette, not a set of one-off values: every step Harness ships is kept
+   * so a later component can pick a step instead of inventing a colour. Only
+   * the alias layer may reference these — see docs/DESIGN.md §2.
+   */
+
+  /* Pure neutrals. */
+  --static-neutral-50: #fafafa;
+  --static-neutral-100: #f5f5f5;
+  --static-neutral-200: #e5e5e5;
+  --static-neutral-300: #d4d4d4;
+  --static-neutral-400: #a2a4a6;
+  --static-neutral-500: #7f8287;
+  --static-neutral-550: #65676b;
+  --static-neutral-600: #545557;
+  --static-neutral-700: #3c3c3d;
+
+  /* Bluish neutrals: every surface and text step. */
+  --static-ink-00: #ffffff;
+  --static-ink-50: #f9fafb;
+  --static-ink-60: #f5f6f7;
+  --static-ink-75: #f1f3f5;
+  --static-ink-100: #ebEEF2;
+  --static-ink-150: #e9ecf2;
+  --static-ink-200: #e1e5ee;
+  --static-ink-300: #cfd3d6;
+  --static-ink-400: #adb2b8;
+  --static-ink-500: #979da6;
+  --static-ink-600: #81858c;
+  --static-ink-700: #61666b;
+  --static-ink-750: #43454a;
+  --static-ink-800: #353638;
+  --static-ink-850: #2c2c2e;
+  --static-ink-875: #232324;
+  --static-ink-900: #1b1b1c;
+  --static-ink-950: #151517;
+  --static-ink-1000: #0f1115;
+
+  /* Sea blue: the Ellen hierarchy scale (hovers, active nav, code surfaces). */
+  --static-sea-50: #f2f6fa;
+  --static-sea-100: #dfebf3;
+  --static-sea-200: #c7dbea;
+  --static-sea-300: #9dc2da;
+  --static-sea-400: #6ca4c8;
+  --static-sea-500: #4284b0;
+  --static-sea-600: #326ea0;
+  --static-sea-700: #28598a;
+  --static-sea-800: #1f456b;
+  --static-sea-900: #163550;
+
+  /* Coral: the Ellen emphasis scale. */
+  --static-coral-50: #fdf1f2;
+  --static-coral-100: #fbe2e5;
+  --static-coral-200: #f8ccd3;
+  --static-coral-300: #f3adb7;
+  --static-coral-400: #ea808e;
+  --static-coral-500: #d94f63;
+  --static-coral-600: #b7384c;
+  --static-coral-700: #8f2e3d;
+
+  /* Links (Harness native blue). */
+  --static-blue-100: #dbeafe;
+  --static-blue-500: #3b82f6;
+  --static-blue-600: #2563eb;
+  --static-blue-900: #0e3074;
+
+  /* Semantic hues. */
+  --static-amber-100: #fef5e7;
+  --static-amber-400: #f7ad31;
+  --static-amber-500: #f59e0b;
+  --static-amber-600: #dd8629;
+  --static-amber-900: #27241f;
+  --static-red-50: #fef2f2;
+  --static-red-100: #fee2e2;
+  --static-red-400: #f25a5a;
+  --static-red-500: #ef4444;
+  --static-red-600: #ec1313;
+  --static-red-900: #570c0c;
+  --static-green-100: #e6faed;
+  --static-green-400: #4ed17e;
+  --static-green-500: #22c55e;
+  --static-green-900: #233c2c;
+
+  /* ---- (2) Semantic aliases -------------------------------------------- */
+
+  /* Surfaces, bottom-up: canvas -> surface -> raised. */
+  --color-canvas: var(--static-ink-00);
+  --color-sidebar: var(--static-ink-50);
+  --color-surface: var(--static-ink-00);
+  --color-sunken: var(--static-ink-50);
+  --color-raised: var(--static-ink-00);
+
+  /* Interaction fills. `-hover` is the resting hover, `-strong` the accent
+     hover used on already-tinted surfaces. */
+  --color-hover: rgba(38, 49, 72, 0.06);
+  --color-hover-strong: rgba(38, 49, 72, 0.14);
+  --color-active: rgba(38, 49, 72, 0.1);
+  --color-selected: var(--static-ink-100);
+
+  /* Text ladder. */
+  /* Text ladder.
+   *
+   * Harness maps its tertiary/caption aliases to neutral-bluish-600/-400, which
+   * measure 3.7:1 and 2.1:1 on white — below the 3:1 floor this product
+   * enforces for auxiliary text. Both light steps are therefore darkened one
+   * notch (documented in DESIGN.md §11); dark needs no adjustment. */
+  --color-ink: var(--static-ink-1000);
+  --color-ink-soft: var(--static-ink-750);
+  --color-muted: var(--static-ink-700);
+  --color-faint: var(--static-ink-600);
+
+  /* Hairlines. Alpha black so a line never disappears when the fill steps up. */
+  --color-border-soft: rgba(0, 0, 0, 0.04);
+  --color-border: rgba(0, 0, 0, 0.1);
+  --color-border-strong: rgba(0, 0, 0, 0.16);
+
+  /* Primary action: near-black in light, coral in dark. */
+  --color-primary: var(--static-ink-1000);
+  --color-primary-hover: var(--static-ink-750);
+  --color-primary-text: var(--static-ink-00);
+  --color-primary-dimmed: var(--static-ink-100);
+
+  /* Links and bluish text. Harness's #4176e6 measures 4.2:1 on white, just
+     under the 4.5:1 body-text floor, so the link step is one notch deeper. */
+  --color-link: #3563c9;
+  --color-link-soft: var(--static-blue-100);
+
+  /* Accent: selection, focus ring, active navigation. */
+  --color-accent: var(--static-blue-600);
+  --color-accent-soft: #e4edfd;
+  --color-accent-rule: #b7c8fe;
+
+  /* Status. Each has a fill (-soft) and a border (-rule). */
+  --color-success: var(--static-green-500);
+  --color-success-soft: var(--static-green-100);
+  --color-success-rule: #a8e3c1;
+  --color-warning-soft: var(--static-amber-100);
+  --color-warning-rule: #f0d9a8;
+  --color-danger: var(--static-red-600);
+  --color-danger-soft: var(--static-red-100);
+  --color-danger-rule: #f5bcbc;
+  --color-warning-track: rgba(221, 134, 41, 0.2);
+  --color-stripe: rgba(0, 0, 0, 0.015);
+
+  /* Inverse surfaces: toast, tooltips, and text on a primary fill. */
+  --color-inverse: var(--static-ink-800);
+  --color-inverse-text: var(--static-ink-50);
+  --color-inverse-danger: var(--static-red-900);
+  --color-inverse-rule-soft: rgba(255, 255, 255, 0.14);
+  --color-inverse-rule: rgba(255, 255, 255, 0.16);
+  --color-inverse-rule-strong: rgba(255, 255, 255, 0.4);
+
+  /* Scrims. */
+  --color-scrim: rgba(0, 0, 0, 0.24);
+  --color-scrim-accent: rgba(228, 237, 253, 0.94);
+
+  /* Scrollbar: the sole consumer is the global scrollbar skin. */
+  --color-scrollbar: var(--static-neutral-200);
+  --color-scrollbar-hover: var(--static-neutral-300);
+
+  /* ---- (3) Geometry ---------------------------------------------------- */
+
+  /* Elevation: three steps; cards never use one. */
+  --shadow-subtle: 0 2px 4px rgba(0, 0, 0, 0.05);
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.1);
+  --shadow-prominent: 0 16px 48px rgba(0, 0, 0, 0.16);
+
+  /* Radius. `--radius-xs` is for inline highlights; `--radius-hairline` for
+     2-4px bars where a control radius would round the bar away. */
+  --radius-hairline: 2px;
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* Spacing. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* Type. The floor is 12px — see DESIGN.md §4.1. */
+  --text-caption: 12px;
+  --text-detail: 13px;
+  --text-body: 14px;
+  --text-subhead: 16px;
+  --text-heading: 20px;
+  --text-title: 24px;
+  --text-display: clamp(26px, 3.4vw, 34px);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-doc: Georgia, "Noto Serif SC", "Songti SC", serif;
+  --font-mono: "SF Mono", "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono",
+    Menlo, Courier, "PingFang SC", "Microsoft YaHei";
+
+  /* Two emphasis weights. 400 is the body default and is never written. */
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* Icon glyph sizes: sized to the control, not to the text scale. */
+  --icon-sm: 13px;
+  --icon-md: 16px;
+  --icon-lg: 20px;
+  --icon-xl: 40px;
+
+  /* Motion. `--ease-standard` matches Harness `--ds-ease-in-out`. */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-fast: 150ms;
+  --motion-base: 200ms;
+  --motion-slow: 300ms;
+  --motion-pulse: 900ms;
+
+  /* Layout widths, read by CSS and by app.js for its clamp maths. */
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 64px;
+
+  /* Per-element overrides: Markdown zoom, the reader's own type sizes. */
+  --md-scale: 1;
   --translation-font-size: 16px;
+  --source-font-size: 14px;
   --source-pane-width: 50%;
-  font-family: Inter, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
-  color: var(--ink);
-  background: var(--canvas);
+
+  color-scheme: light;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-canvas);
+  accent-color: var(--color-accent);
+}
+
+/* ---- Dark theme: the Ellen skin ---------------------------------------- */
+
+html[data-theme="dark"] {
+  /* Structures desaturate toward slate so they read as muted surfaces. */
+  --static-ink-00: #ffffff;
+  --static-ink-50: #f9fafb;
+  --static-ink-100: #ebEEF2;
+  --static-ink-300: #cfd3d6;
+  --static-ink-400: #adb2b8;
+  --static-ink-500: #979da6;
+  --static-ink-600: #81858c;
+  --static-ink-700: #61666b;
+  --static-ink-750: #43454a;
+  --static-ink-800: #353638;
+  --static-ink-850: #2c2c2e;
+  --static-ink-875: #232324;
+  --static-ink-900: #1b1b1c;
+  --static-ink-950: #151517;
+  --static-ink-1000: #0f1115;
+  --static-neutral-200: #3c3c3d;
+  --static-neutral-300: #545557;
+  --static-neutral-600: #545557;
+  --static-neutral-700: #3c3c3d;
+
+  /* Ellen: sea blue replaces the ice blue and carries the hierarchy. */
+  --static-sea-300: #aac0cf;
+  --static-sea-800: #2e455c;
+  --static-sea-900: #223445;
+
+  --color-canvas: var(--static-ink-950);
+  --color-sidebar: var(--static-ink-900);
+  --color-surface: var(--static-ink-875);
+  --color-sunken: var(--static-ink-900);
+  --color-raised: var(--static-ink-850);
+
+  --color-hover: rgba(255, 255, 255, 0.08);
+  --color-hover-strong: rgba(255, 255, 255, 0.24);
+  --color-active: rgba(255, 255, 255, 0.14);
+  --color-selected: var(--static-ink-800);
+
+  --color-ink: var(--static-ink-50);
+  --color-ink-soft: var(--static-ink-300);
+  --color-muted: var(--static-ink-400);
+  --color-faint: var(--static-ink-600);
+
+  /* White-alpha hairlines: a darkened fill would swallow a stepped-up line. */
+  --color-border-soft: rgba(255, 255, 255, 0.06);
+  --color-border: rgba(255, 255, 255, 0.12);
+  --color-border-strong: rgba(255, 255, 255, 0.2);
+
+  /* Ellen primary: light coral with dark text. Bright coral with white text
+     only reaches 2.9:1, so the foreground flips instead. */
+  --color-primary: var(--static-coral-400);
+  --color-primary-hover: var(--static-coral-500);
+  --color-primary-text: var(--static-ink-1000);
+  --color-primary-dimmed: var(--static-ink-750);
+
+  --color-link: var(--static-sea-300);
+  --color-link-soft: var(--static-sea-800);
+
+  --color-accent: var(--static-sea-400);
+  --color-accent-soft: var(--static-sea-800);
+  --color-accent-rule: var(--static-sea-300);
+
+  --color-success: var(--static-green-400);
+  --color-success-soft: var(--static-green-900);
+  --color-success-rule: #2c5b41;
+  --color-warning: var(--static-amber-400);
+  --color-warning-soft: var(--static-amber-900);
+  --color-warning-rule: #5c4a2a;
+  --color-danger: var(--static-red-400);
+  --color-danger-soft: var(--static-red-900);
+  --color-danger-rule: #6d2a2a;
+  --color-warning-track: rgba(247, 173, 49, 0.22);
+  --color-stripe: rgba(255, 255, 255, 0.015);
+
+  --color-inverse: var(--static-ink-750);
+  --color-inverse-text: var(--static-ink-50);
+  --color-inverse-danger: #7a2019;
+
+  --color-scrim: rgba(0, 0, 0, 0.5);
+  --color-scrim-accent: rgba(46, 69, 92, 0.94);
+
+  --color-scrollbar: var(--static-neutral-700);
+  --color-scrollbar-hover: var(--static-neutral-600);
+
+  /* Shadows are near-invisible on dark; hierarchy rests on the fill ladder. */
+  --shadow-subtle: 0 2px 4px rgba(0, 0, 0, 0.24);
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-prominent: 0 16px 48px rgba(0, 0, 0, 0.5);
+
+  color-scheme: dark;
+}
+
+/* Users who ask for less motion get instant state changes instead of the
+   hover/scroll animations the workbench uses everywhere. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -1,3 +1,288 @@
+# fxxk_file v1.12.0
+
+2026-09-16
+
+按 DeepSeek Harness 重新设计配色（浅色取 Harness 原生、深色取艾莲），导航改为
+「侧栏切功能、顶栏切页面」的双层结构，Markdown 目录改为回答「我现在读到哪一节」。
+
+## 设计规范
+
+- `docs/DESIGN.md` 重写：新增**三层令牌架构**（静态色阶 `--static-*` → 语义别名
+  `--color-*` → 几何令牌），配色对齐 Harness —— 浅色用其原生浅色，深色用艾莲深色，
+  两个产品看起来是同一家族。组件只允许引用语义别名层，CI 会拒绝 `var(--static-*)`。
+- **浅色主操作改为近黑**（`#0f1115`），蓝色只留给链接；**深色主操作为浅珊瑚配深色文字**
+  （亮珊瑚 `#ea808e` 配白字只有 2.9:1）。
+- 对比度实测并修正：浅色下 `--color-muted`(5.8:1) 与 `--color-faint`(3.7:1) 达标，
+  链接色从 Harness 的 `#4176e6`(4.2:1) 加深到 `#3563c9`(5.6:1) 以满足 4.5:1 正文要求。
+- 新增全局滚动条皮肤 `styles/scrollbar.css`（此前深色下仍是系统亮色滚动条）。
+
+## 导航
+
+- **侧栏 = 功能切换**：五个功能各一条（图标 + 文字），选中项用 `--color-accent-soft`
+  填充加 2px 指示条；底部固定「深色模式 / 模型设置」两个全局项。
+- **顶栏 = 页面切换**：文档翻译为「原件版面对照 / 逐段精确对照 / 繁简转换 / 下载译文」，
+  图片转换为两个方向，Markdown 为「打开 / 编辑 / 全屏」；页面清单集中在 `WORKSPACES`
+  一处声明，切换器由此渲染。当前页由实时状态推导，用快捷键或工具栏进入也能正确高亮。
+- **侧栏可折叠**：`240px ↔ 64px`，折叠态只留图标（`title` + `aria-label` 补全文字），
+  状态写入偏好并在首屏内联脚本落地，`Ctrl+B` 切换。≤980px 自动收窄、≤720px 变 56px
+  图标条——功能切换在任何宽度都可达。
+- 侧栏本身不再整体滚动：功能列表与底部全局项固定，只有当前功能的控件在内部滚动。
+
+## Markdown
+
+- **标题不再吸顶，只保留表格头吸顶。** 上一版让章节标题吸在 `top: 0`，只要两节同时
+  进入视口就会叠在一起，看起来像文字压字；文档里还有 `--markdown-sticky-offset` 按
+  标题高度把表格头往下推，标题一多就错位。现在标题恢复 `position: static`，
+  阅读列里只有表格头吸在 `top: 0`，不会再有第二个元素和它抢同一条带子。
+  「当前读到哪一节」改由左侧目录单独表达（高亮 + 节名 + 进度条），不再重复第三遍。
+- 随之删除 `--markdown-sticky-offset` 变量与 `.markdown-active-heading` 的样式：
+  前者不再需要（标题不吸顶就没有偏移量），后者在样式表里本来就没有对应规则，
+  是一直在加的**死类**。
+- **目录显示「当前在哪一节」**：滚动时按位置计算当前标题，命中项加 `.active`
+  （软底 + 链接色 + 2px 指示条），标题名同步显示在目录头部，目录右缘有阅读进度条；
+  当前项超出可视区时目录自身滚动使其可见。判定改为"标题**底边**越过顶边"，
+  这样标题刚开始露出时目录就已经跟上，不会滞后一节。
+- **一个控件只做一件事**（此前拖到最左即收起、与按钮职责重叠）：
+  - 工具栏新增 `#markdownTocToggle` 按钮（`Ctrl+\`）负责**显示 / 隐藏**；
+  - 6px 分隔条只负责**调宽**（140–420px，双击复位 196px），拖到最左只夹到最小宽度，
+    不再把目录拖没；目录隐藏时分隔条一并消失。
+  - 折叠不重置宽度，宽度与可见性分别持久化。
+
+## 验证
+
+- 两套主题对比度经脚本实测（`theme-check.mjs`）：浅色 ink 18.9 / ink-soft 9.6 /
+  muted 5.8 / faint 3.7 / link 5.6；深色 17.5 / 12.1 / 8.5 / 4.9 / 9.7。
+- 侧栏折叠（240→64，上下文隐藏、导航仍在）、页面页签渲染、目录当前节跟踪
+  （文首高亮首标题、滚到 60% 高亮第 8 节）、分隔条调宽与按钮显隐互不干扰、
+  刷新后宽度与可见性均保留。
+- 表格吸顶经 `sticky-header.mjs` 实测：`headingPosition` 为 `static`（标题不再吸顶）、
+  `headerPosition` 为 `sticky`、`headerTop` 为 `0px`、`pinnedHeadings` 为空、
+  `headingsOverlappingHeader` 为空——没有任何标题与表格头重叠。`zorder-check.mjs`
+  逐 4px 采样表头所在带子，自上而下依次是 `th` → `td`，中间没有别的元素。
+- `pytest tests`：**143 passed, 1 skipped**；`node --check` 五个脚本；
+  32 条路由齐全；设计检查 153 个令牌、9 张样式表、12px 下限；1440/1024/720 无横向溢出。
+
+---
+
+# fxxk_file v1.11.0
+
+2026-09-16
+
+新增设计规范 `docs/DESIGN.md`，把全站的字号、字重、圆角与动效时长收敛到封闭刻度；
+Markdown 阅读器不再限制行长，整个内容列交给正文，左侧目录可拖动调宽或收起。
+
+## 设计规范
+
+- 新增 [docs/DESIGN.md](docs/DESIGN.md)：色彩、字体排印、间距/圆角/阴影、动效、布局、
+  z-index 阶梯、组件约定、无障碍与强制手段，逐条说明**为什么是这些值**及使用边界。
+  这是界面取值的唯一依据，`docs/FRONTEND_STRUCTURE.md` 只保留代码结构说明。
+- **全站最小字号 12px。** 原先的 10.5px/12.5px/13.5px 在 100% 缩放的 Windows 上，
+  中文标点会糊成一条灰带。字阶收敛为 12 / 13 / 14 / 16 / 22，另加大标题三档
+  `--text-title` / `--text-display` / `--text-hero`（clamp 缩放）。
+- **字重收敛为 300 / 500 / 600**，删除 650 与 700。`--weight-regular`(400) 只用于
+  撤销表单控件继承来的加粗，正文不显式声明。
+- **动效时长令牌化**：新增 `--motion-fast/base/slow/pulse` 与 `--ease-standard`/`--ease-reveal`，
+  样式表里不再出现 `0.15s` 这类字面量。
+- **颜色字面量清空**：toast 上的白色透明描边、对话框遮罩、拖拽遮罩底色、进度条轨道、
+  未翻译段落的斜纹全部提升为令牌（`--rule-inverse*`、`--scrim`、`--scrim-accent`、
+  `--attention-track`、`--stripe`），`tokens.css` 之外再无 hex 或 `rgba()`。
+- 新增 `--icon-sm/md/lg/xl`：图标按控件尺寸取值，不再借用文字阶梯。
+  圆角新增 `--radius-hairline`(2px)，专供 2–4px 的进度条。
+
+## 界面
+
+- **Markdown 阅读器铺满内容列**：删除 78ch 的行长上限。此前 1440px 窗口下正文只占
+  屏幕 47%，两侧各有约 150px 空白；现在正文宽度等于内容列宽度（1440px 下 954px），
+  内边距改随视口缩放（`clamp(24px, 4vw, 64px)`）。
+- **目录可拖动**：新增 `#markdownTocSplitter`，与译文区的分隔条同一套交互——
+  拖动调宽（140–420px）、拖到 96px 以下收起、单击轨道切换、双击复位/展开、
+  方向键微调（`Shift` 加速），宽度写入 `fxxk_file-display-preferences-v1.markdownTocWidth`。
+  窄于 720px 时目录与轨道一起隐藏。
+- 功能菜单增加 150ms 的淡入位移，让弹出方向可被眼睛跟随。
+
+## 强制手段
+
+- CI 的令牌检查从 2 条扩到 6 条：未定义令牌、硬编码颜色（新增 `rgba()` 检测）、
+  `font-size`/`font-weight`/`border-radius` 必须取令牌或 clamp、**12px 字号下限**、
+  动效时长必须取 `--motion-*`、令牌必须被消费。
+- `.tmp/integration/token-check.py` 改为运行同一套规则并带退出码，本地与 CI 行为一致。
+
+## 验证
+
+- `pytest tests`：**143 passed, 1 skipped**；`node --check` 五个脚本；
+  32 条路由齐全；令牌检查 76 个令牌全部被消费。
+- Chromium 实机验证：1440/1024/720 三档无横向溢出、无控制台异常；三个对话框几何实测
+  （900px 高不滚动、560px 高主体滚动且操作条可见）；目录分隔条实测拖动、收起、
+  键盘微调与刷新后保留。
+- `git diff --check` 通过。
+
+---
+
+# fxxk_file v1.10.0
+
+2026-09-16
+
+统一了对话框与工作区工具栏的布局规则，长表单不再把保存按钮挤出屏幕，窄窗口下按钮改为换行而不是被裁切。
+
+## 界面
+
+- **对话框三段式**：`#shortcutDialog`、`#settingsDialog`、`#compareDialog` 统一为「固定标题条 + 可滚动主体 + 固定操作条」。此前设置面板直接撑高整窗，在 768px 高的屏幕上保存按钮会落到视口外；现在主体内部滚动，标题条与「取消／保存设置」始终可见（560px 高窗口实测：对话框高 512px，主体可滚动，操作条完整可见）。
+- **对话框标题条**：标题、说明与关闭按钮合并到一条带 `--sheet` 底色和 1px 分隔线的头部，标题 15px、说明限制在 46 字符宽以内；关闭按钮统一 28px 并带 `aria-label`。
+- **译文工具栏分组**：语言方向、执行动作（翻译空白段落／重译全文／繁简转换）、视图、输出四组之间用 1px 竖线分隔；「原件版面对照 / 逐段精确对照」改为一个 `1px` 边框的分段控件，选中项用 `--accent-soft` 表示，不再是两个各自带边框的按钮。
+- **工具栏换行**：`.document-toolbar`、`.markdown-toolbar`、`.convert-toolbar`、`.compare-toolbar`、`.images-toolbar` 全部允许换行，1024px 与 720px 宽度下长标题与多按钮不再互相挤压。
+- **文件转换工作区**：「开始转换」收进一张带说明的 `.convert-action` 卡片，转换中状态点用脉冲动画；结果区标题前加一枚完成状态点，统计从「N 个字符」改为「N 个字符 · M 行」；面板内的文本域改为撑满卡片高度，短表单不再留大片空白。
+- **提示条**：toast 改为顶部对齐并加 3px 左侧色条（成功用 `--settled`，错误用 `--danger-rule`），长文案不再与操作按钮垂直居中错位；拖拽遮罩内容改为一张居中卡片，补充支持格式说明。
+- 静态资源版本号更新为 `20260916-layout`。
+
+## 验证
+
+- Chromium 实机验证：1440×900、1024×768、720×900 三种宽度下五个工作区与三个对话框均无横向溢出、无控制台异常；对话框几何经脚本实测（含 560px 高窗口的内部滚动场景）。
+- 文件转换六组工具全部跑通（编码检测、表格互转、字幕合并、Markdown→DOCX、PDF 合并、金额／中文数字／拼音），无控制台异常。
+- 通过 `node --check`、令牌与颜色检查、路由检查、`pytest tests`。
+
+---
+
+# fxxk_file v1.9.0
+
+2026-09-15
+
+新增独立的「文件转换」工作区，六组小众转换能力全部在本机完成，并接入可选的依赖探测、CI 校验与完整测试。
+
+## 新增
+
+- **中文排版**：自动检测 GB18030／Big5／Shift-JIS 等遗留编码并转 UTF-8（结果会显示检测到的编码）、全角↔半角、中英标点互转。编码检测基于 charset-normalizer，并按本项目的支持列表收敛候选，避免把中文文件判成韩文或 UTF-16。
+- **表格互转**：CSV、TSV、JSON、Markdown 表格、HTML 表格任意互转，来源格式可自动识别。HTML 解析用标准库的 `HTMLParser`，不引入解析依赖；Markdown 输出使用渲染器接受的 `---` 分隔符。
+- **字幕互转**（pysubs2，MIT）：SRT／VTT／ASS／SSA／LRC 互转；双语合并按**时间轴**而非序号对齐，其中一份重排或漏句时不会整体错位；双语拆分按行输出多条独立 SRT。
+- **文档互转**：HTML → Markdown（markdownify，MIT）、DOCX → Markdown（python-docx，按文档顺序输出标题/列表/引用/表格）、Markdown → DOCX。
+- **PDF 页面**（pikepdf，MPL-2.0）：合并、按页拆分（打包 ZIP）、提取指定页、删除指定页、旋转、文字水印。页码支持 `1-3,7` 语法并对越界给出明确提示；删除全部页面会被拒绝。
+- **数字与拼音**：金额中文大写（Decimal 解析，无浮点误差）、整数转中文数字、汉字拼音标注（pypinyin，MIT）。
+- 新增 `GET /api/convert/capabilities`：按组返回可用性与缺失依赖的安装提示，前端据此置灰对应工具。
+- 新增 `requirements-convert.txt`：可选的四个转换依赖，未安装时其余功能不受影响。
+
+## 实现说明
+
+- 转换逻辑集中在 `app/services/converters/`，一组一个模块；路由 `app/api/routers/conversions.py` 只负责参数、错误码与响应形态。
+- 前端 `convert.js` 不做任何转换计算，只提交表单并展示结果，因此规则只有一份实现、一套测试。
+- 转换接口会把整份文件读入内存，因此上传上限是 40 MB（翻译上传路径仍是 80 MB 流式）。
+- 多文件输出（字幕拆分、PDF 拆分）写入 `output/converted/*.zip` 并返回带随机 token 的下载地址。
+
+## 验证
+
+- `pytest tests`：**143 passed, 1 skipped**。新增 `tests/test_converters.py`（67 项，工具层）与 `tests/test_convert_api.py`（26 项，HTTP 层），覆盖编码检测、表格双向往返、字幕合并/拆分、PDF 页码边界、金额大写与拼音风格。
+- Chromium 实机验证：六组工具全部跑通（全角转半角 `ＡＢＣ１２３`→`ABC123`；GB18030 文件识别为 `gb18030` 并正确转码；CSV→Markdown；双语字幕合并；Markdown→DOCX 下载；两个 PDF 合并；金额/中文数字/拼音），无控制台异常。
+- CI 增加 `requirements-convert.txt` 安装、`convert.js` 语法检查与 7 条转换路由存在性校验；令牌与硬编码颜色检查仍然通过。
+
+---
+
+# fxxk_file v1.8.0
+
+2026-09-15
+
+本次更新按「冷色调工具风」重建了整个界面，并把审校流程从逐段操作升级为可筛选、可批量执行，同时补上停止翻译与快捷键面板。
+
+## 界面
+
+- 颜色、间距、圆角、阴影全部收敛到 `app/static/styles/tokens.css`：单一强调色（校样蓝 `#2b6cb0`）、四级文字层级、四面纸灰色表面、两档阴影、四档圆角、`4/8/12/16/24/32` 间距刻度。CI 会校验功能样式表里不再出现未定义令牌或硬编码颜色。
+- 深度策略统一为「只用边框」：面板用 1px 分隔线与表面色差区分，只有对话框、下拉菜单、拖拽遮罩使用浮层阴影；去掉原先的多套渐变与多主题配色。
+- 译文区改为以状态规则条表达状态：每段译文格左侧 2px 颜色条对应待翻译／机器译文／已编辑／已审校，不再依赖整块背景色；未翻译段落用极淡斜纹提示。
+- 顶栏与工具栏收敛为统一高度、统一 32px 控件与 6px 圆角；侧栏选项合并为一组，功能切换器、模型设置、快捷键入口样式统一。
+- 补齐交互状态：所有控件具备 hover / active / focus-visible / disabled；`prefers-reduced-motion` 下关闭动画；`Ctrl` 组合键与 `?` 面板可纯键盘完成。
+
+## 操作
+
+- **段落筛选**：译文区新增筛选栏，按全部／待翻译／机器译文／已编辑／已审校／已锁定筛选，实时显示每类数量与「筛选出 N / 总数」。
+- **批量操作**：新增 `POST /api/documents/{id}/segments/batch`，支持锁定、解锁、标记审校、撤销审校、清空译文五种动作。筛选在服务端按持久化数据执行，因此长文档只渲染部分段落时也不会漏改；已锁定段落对「标记审校／清空译文」免疫，只有「解锁」与「撤销审校」会改动它们。选择逻辑独立在 `app/services/segment_batch.py`。
+- **停止翻译**：新增 `POST /api/documents/{id}/cancel`。停止后已完成译文全部保留，排队中段落退回「待翻译」；重启后若段落停在排队状态，点一次停止即可释放。
+- **快捷键面板**：新增顶部入口与 `?` 快捷键，按当前工作区过滤可用组合键；新增 `Ctrl+O` 打开文件、`Ctrl+1/2` 切换视图、`Ctrl+D` 下载译文。
+- **可操作的错误提示**：鉴权、代理、连接类失败会在提示条上给出「打开模型设置」或「重试翻译」按钮，提示说明原因而不是只报状态码。
+- 保存状态从纯文本改为带状态点的指示（空闲／保存中／已保存／保存失败）。
+
+## 验证
+
+- `pytest tests`：**50 passed, 1 skipped**（新增 `tests/test_batch_api.py`，覆盖批量接口与停止接口，含 404／422／幂等／锁定豁免等边界）。
+- Chromium 实机验证：1440×900、1024×768、720×900 三种宽度无横向溢出，五个工作区与三个对话框无控制台异常；批量锁定在真实文档上验证（16 段待翻译 → 服务端 21 段锁定），筛选计数与行数同步更新。
+- 通过 `python -m compileall -q app tools`、`node --check`、令牌与颜色检查、vendor 资源与路由检查、`git diff --check`。
+
+---
+
+# fxxk_file v1.7.0
+
+2026-09-14
+
+本次更新从 GitHub 甄选并集成了四组成熟开源项目，覆盖繁简转换、扫描件 OCR、PDF 版面抽取、Markdown 渲染与文档差异对比；同时修复了长文档导入卡顿和 DOCX 译文导出随机失败两个缺陷。
+
+## 性能修复
+
+- **大 PDF 导入卡顿**：`pdfplumber` 的 `layout=True` 会把每一行视觉行当成独立段落，134 页的 GB 征求意见稿因此产生 1570 个段落、约 356 KB 首屏响应，导入时浏览器主线程被阻塞约 1.5 秒、整体耗时 20 秒。现在默认改用 `plain` 抽取（同一文件 156 段），并新增 `TRANSLATION_PDF_LAYOUT_MODE=layout` 供需要多栏阅读顺序时启用；`layout` 模式也改为基于词坐标重建行与分栏，段落数与 `plain` 相当（134 页实测 153 段，11 秒，此前为 1570 段）。
+- **长文档渲染卡顿**：译文行高测量原先对每一行都强制同步布局，1570 行需要约 2.1 秒、3000 行需要约 4 秒。现在只测量视口附近的行，其余保持 CSS 默认高度并按滚动逐步补齐；切换到「全部重排」的两遍式测量（先统一重置、再统一写回）也把代价降到毫秒级。实测 3000 段首次渲染约 0.35 秒，字号调整约 0.21 秒。
+
+## 修复
+
+- 修复 `iter_docx_text_paragraphs` 用 `id()` 去重合并单元格的问题。python-docx 会复用临时单元格代理对象的内存地址，导致同一文件的段落数在导入与导出两次遍历中不一致，DOCX 译文导出随机报「原文有 N 个文本段，工作区有 M 个翻译段」。现改为按 `w:tc` 元素本身去重。
+- 修复 Markdown 模块中一处乱码字符串（`"缂栬緫 Markdown"` 应为 `"编辑 Markdown"`）。
+- 修复 DOMPurify 净化时误删任务列表复选框与表格列定义的问题（补全 `input/col/colgroup` 及相关属性白名单）。
+
+## 集成的新能力
+
+### 1. 繁简转换（zhconv）
+
+- 新增 `app/services/text_normalize.py`，基于 [zhconv](https://github.com/yichen0831/opencc-python)（Apache-2.0）。
+- 侧栏「译文中文」可选择跟随目标语言（简体）／简体中文／繁體中文／不做转换；设置同时写入 `.env` 的 `TRANSLATION_ZH_SCRIPT`，并作为提示词规则发送给模型。
+- 翻译返回后自动转换中文译文；工具栏新增「繁简转换」按钮，可对整篇文档立即重跑（已审校段落会退回「已编辑」）。
+- 新增 `POST /api/documents/{id}/convert-script` 接口，全程本地完成，不消耗模型额度。
+
+### 2. 扫描件离线 OCR（RapidOCR，可选）
+
+- 新增 `app/services/ocr.py`，基于 [RapidOCR](https://github.com/RapidAI/RapidOCR)（Apache-2.0）与 [pypdfium2](https://github.com/pypdfium2-team/pypdfium2)。
+- 上传区新增「扫描件自动 OCR（离线）」，没有文字层的 PDF 可在本机识别后再翻译，文档不会离开本机。
+- 通过 `requirements-ocr.txt` 单独安装（约 200 MB）；未安装时选项自动置灰，`/api/settings` 的 `ocr_available` 返回 `false`。
+- 单文件最多识别前 80 页，识别结果按行距自动聚合成段落。
+
+### 3. PDF 版面抽取（pdfplumber）
+
+- 新增 `app/services/pdf_layout.py`，基于 [pdfplumber](https://github.com/jsvine/pdfplumber)（MIT）。
+- PDF 文本改为按坐标还原阅读顺序，双栏、表格式排版的段落顺序明显改善；pdfplumber 缺失时自动回退到 pypdf。
+
+### 4. 句子边界（pySBD）与段落切分
+
+- `segmenter.py` 接入 [pySBD](https://github.com/nipunsadvilkar/pySBD)（MIT），正确处理 `Dr.`、`2.1`、`U.S.` 等缩写与中文标点，替代原先的正则边界规则；异常时回退旧逻辑。
+
+### 5. Markdown 渲染引擎（markdown-it + DOMPurify）
+
+- 内置 [markdown-it](https://github.com/markdown-it/markdown-it) 15、[markdown-it-task-lists](https://github.com/revin/markdown-it-task-lists) 与 [DOMPurify](https://github.com/cure53/DOMPurify) 3，全部放在 `app/static/vendor/`，不访问 CDN。
+- 支持任务列表、自动链接、嵌套列表、围栏代码、删除线等此前不完整的语法；表格分隔符与列对齐处理更规范。
+- 渲染结果先经 DOMPurify 净化，`javascript:` 等非白名单链接会降级为纯文本，源文件中的 `<script>` 不会执行。
+- 目录、表格自适应与列宽拖拽等既有交互通过 DOM 约定保持不变；插入方式由 `innerHTML` 改为 `replaceChildren`。
+
+### 6. 双文件差异高亮（jsdiff）
+
+- 内置 [jsdiff](https://github.com/kpdecker/jsdiff) 9（BSD-3-Clause），对比工具栏新增「高亮差异」。
+- 两份文档的抽取文本在浏览器本地做行级对比，绿色为新增、红色删除线为删除，并给出增删行数统计。
+
+## 依赖与 CI
+
+- `requirements.txt` 新增 `pdfplumber==0.11.10`、`pysbd==0.3.4`、`zhconv==1.4.3`。
+- 新增 `requirements-ocr.txt` 作为可选 OCR 依赖。
+- 新增 `tests/test_integrations.py`（30 项），覆盖繁简转换、句子切分、DOCX 段落遍历稳定性、PDF 分栏与 CJK 拼接、OCR 段落聚合与 vendor 资源完整性；CI 现在会运行 `pytest`。
+- CI 新增 vendor 资源与许可证校验，并检查新增路由。
+
+## 升级说明
+
+- 从 `v1.6.2` 升级需重新安装依赖：`python -m pip install -r requirements.txt`。
+- 如需扫描件识别，再执行 `python -m pip install -r requirements-ocr.txt`。
+- 无需迁移数据；`.env` 未设置 `TRANSLATION_ZH_SCRIPT` 时默认为 `auto`（目标语言为中文时转简体），与原行为基本一致。
+- 未设置 `TRANSLATION_PDF_LAYOUT_MODE` 时默认 `plain`，本次性能修复默认生效；需要多栏阅读顺序时改为 `layout`。
+- 此前因 `layout=True` 产生的超长文档（例如 134 页 PDF 被拆成 1570 段）可重新导入一次，以获得更合理的分段。
+
+## 验证
+
+- 新增 30 项 pytest 用例全部通过（含 1 项按需跳过）。
+- 使用真实 Chromium 完成端到端检查：文档导入与译文导出、繁简转换接口、Markdown 全语法渲染与 XSS 防护、表格列宽拖拽、双文件 DOCX 差异高亮，页面无控制台异常。
+- 使用真实 134 页 PDF 复测：导入耗时从约 20 秒降到约 14 秒，主线程最长阻塞从约 1.5 秒降到约 0.1 秒，段落数从 1570 降到 156；3000 段合成文档首次渲染约 0.35 秒、字号调整约 0.21 秒。
+- 通过 `python -m compileall -q app tools`、`node --check` 以及 vendor/路由/DOM id 校验。
+
+---
+
 # fxxk_file v1.6.2
 
 2026-08-27

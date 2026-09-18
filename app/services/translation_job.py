@@ -8,6 +8,7 @@ from app.config import get_settings
 from app.services.glossary import load_style_guide, load_terms, relevant_terms
 from app.services.segmenter import split_into_segments
 from app.services.storage import GLOSSARIES, create_translated_docx, load_document, save_document
+from app.services.text_normalize import normalize_translation
 from app.services.translator import translate_batch
 
 
@@ -156,8 +157,15 @@ async def _translate_items(document: dict, items: list[dict[str, str]]) -> dict[
                 await _set_retry_state(document_id, None)
 
     joiner = "" if target_lang == "zh" else " "
+    # A per-document override wins over the machine-wide default so one
+    # Traditional-Chinese job does not flip the global setting.
+    script_mode = document.get("zh_script_mode") or get_settings().zh_script_mode
     return {
-        item["id"]: joiner.join(translated_parts[part_id] for part_id in part_ids[item["id"]]).strip()
+        item["id"]: normalize_translation(
+            joiner.join(translated_parts[part_id] for part_id in part_ids[item["id"]]).strip(),
+            target_lang,
+            script_mode,
+        )
         for item in items
     }
 

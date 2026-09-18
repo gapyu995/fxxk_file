@@ -1,45 +1,302 @@
-/* Shared controls, dialogs, feedback, and utility styles. */
+﻿/* Shared controls, dialogs, feedback, and utility styles.
+ *
+ * Depth strategy: borders only. The desk metaphor is paper on paper, so
+ * elevation is a one-pixel rule plus a surface shift, never a dramatic shadow.
+ * Overlays (dialogs, the drop target) are the single exception and get
+ * --shadow-overlay.
+ */
 
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
-body { overflow: hidden; transition: background .25s ease; }
-body.translate-theme { background: radial-gradient(circle at 15% 0%, #f5fbf7 0, var(--canvas) 42%, #eef4f0 100%); }
-body.compare-theme { background: radial-gradient(circle at 85% 0%, #eef6ff 0, #f4f7f8 42%, #e9eef1 100%); }
+body { overflow: hidden; color: var(--color-ink); background: var(--color-canvas); }
+
 button, input, select, textarea { font: inherit; }
 button, select { color: inherit; }
-select { appearance:none; border:1px solid #d4dfd9; border-radius:9px; background:linear-gradient(180deg,#fff,#f7faf8); padding:0 30px 0 11px; font-size:12px; cursor:pointer; transition:border-color .18s,box-shadow .18s,background .18s; }
-select:hover { border-color:#9fc2af; background:#fbfefc; }
-select:focus { outline:none; border-color:var(--green); box-shadow:0 0 0 3px rgba(22,106,75,.12); }
 
-.button { display: inline-flex; align-items: center; justify-content: center; border: 1px solid #d2ddd7; background: linear-gradient(180deg,#fff,#f8faf9); padding: 8px 13px; border-radius: 9px; color: #34423b; font-weight: 650; font-size: 12px; cursor: pointer; white-space: nowrap; text-decoration: none; box-shadow:0 2px 6px rgba(35,62,48,.05); transition:transform .16s,box-shadow .16s,border-color .16s,background .16s; }
-.button:hover { border-color: #9fbead; background: #fbfefc; box-shadow:0 4px 11px rgba(35,62,48,.1); transform:translateY(-1px); }
-.button:active { transform:translateY(0); box-shadow:0 1px 3px rgba(35,62,48,.08); }
-.button.primary { color: white; background: var(--green); border-color: var(--green); }
-.button.primary:hover { background: var(--green-dark); }
-.button:disabled { opacity: .55; cursor: wait; }
-.button.subtle { background: transparent; border-color: transparent; }
+/* ---- Form controls ------------------------------------------------------ */
 
-.settings-dialog { width: min(520px, calc(100vw - 30px)); border: 0; border-radius: 14px; padding: 0; box-shadow: 0 28px 80px rgba(20,35,28,.25); }
-.settings-dialog::backdrop { background: rgba(15,24,20,.42); backdrop-filter: blur(2px); }
-.settings-dialog form { padding: 24px; }
-.dialog-heading { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
-.dialog-heading h2 { margin: 0 0 5px; font-family: Georgia, "Noto Serif SC", serif; font-size: 21px; }
-.dialog-heading p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
-.settings-dialog label { display: block; font-size: 11px; font-weight: 700; margin-top: 13px; }
-.settings-dialog label input, .settings-dialog label select { display: block; width: 100%; height: 40px; margin-top: 6px; border: 1px solid #cfd7d2; border-radius: 8px; padding: 0 11px; background:white; font-size: 12px; outline: none; }
-.settings-dialog label input:focus, .settings-dialog label select:focus { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
-.settings-dialog label.clear-key { display:flex; align-items:center; gap:8px; color:var(--muted); font-weight:400; }
-.settings-dialog label.clear-key input { display:inline-block; width:auto; height:auto; margin:0; accent-color:var(--green); }
-.setting-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.key-hint { color: var(--muted); font-size: 10px; min-height: 15px; margin-top: 5px; }
-.model-hint { margin-top: 7px; padding: 9px 11px; border: 1px solid #d8e6dd; border-radius: 8px; background: #f3faf6; color: var(--muted); font-size: 11px; line-height: 1.7; }
-.model-hint code { font: 11px/1.6 ui-monospace, Consolas, "Courier New", monospace; color: var(--green-dark); background: #e7f2eb; padding: 1px 5px; border-radius: 4px; }
-.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
-.toast { position: fixed; right: 22px; bottom: 22px; max-width: min(620px,calc(100vw - 44px)); padding: 11px 15px; border-radius: 9px; color: white; background: #26332d; box-shadow: var(--shadow); z-index: 30; font-size: 12px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
-.toast.error { background: #8b3531; }
-.upload-overlay { position: fixed; inset: 0; z-index: 25; background: rgba(232,243,237,.92); display: grid; place-items: center; border: 6px solid var(--green); }
-.upload-overlay div { display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--green-dark); }
-.upload-overlay span { font-size: 55px; font-weight: 200; }
+select {
+  appearance: none;
+  height: 32px;
+  padding: 0 28px 0 var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-size: var(--text-detail);
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--ease-standard), box-shadow var(--motion-fast) var(--ease-standard);
+}
+select:hover:not(:disabled) { border-color: var(--color-faint); }
+select:disabled { color: var(--color-faint); background-color: var(--color-sunken); cursor: not-allowed; }
+
+/* The chevron is drawn with borders so it inherits the text colour instead of
+   freezing a hex inside an inline SVG data URI. */
+.select-wrap { position: relative; display: inline-flex; }
+.select-wrap::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 11px;
+  width: 6px;
+  height: 6px;
+  margin-top: -4px;
+  border-right: 1.6px solid var(--color-muted);
+  border-bottom: 1.6px solid var(--color-muted);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+.select-wrap > select { width: 100%; }
+.select-wrap:has(select:disabled)::after { border-color: var(--color-faint); }
+
+/* One focus treatment for every control, including borderless icon buttons. */
+:where(button, a.button, label.button, select, input, textarea, [role="separator"]):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ---- Buttons ------------------------------------------------------------ */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-ink-soft);
+  font-size: var(--text-detail);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--ease-standard), background var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard);
+}
+.button:hover:not(:disabled) { border-color: var(--color-faint); background: var(--color-hover); color: var(--color-ink); }
+.button:active:not(:disabled) { background: var(--color-active); }
+.button:disabled { color: var(--color-faint); background: var(--color-sunken); border-color: var(--color-border); cursor: not-allowed; }
+
+.button.primary { border-color: var(--color-primary); background: var(--color-primary); color: var(--color-primary-text); }
+.button.primary:hover:not(:disabled) { border-color: var(--color-primary-hover); background: var(--color-primary-hover); color: var(--color-primary-text); }
+.button.primary:active:not(:disabled) { background: var(--color-primary-hover); }
+.button.primary:disabled { border-color: var(--color-border); background: var(--color-primary-dimmed); color: var(--color-faint); }
+
+.button.subtle { border-color: transparent; background: transparent; color: var(--color-muted); }
+.button.subtle:hover:not(:disabled) { border-color: var(--color-border); background: var(--color-hover); color: var(--color-ink); }
+
+/* Turns into the stop control while a run is in flight. */
+.button.danger { border-color: var(--color-danger-rule); background: var(--color-danger-soft); color: var(--color-danger); }
+.button.danger:hover:not(:disabled) { border-color: var(--color-danger); background: var(--color-danger); color: var(--color-primary-text); }
+.button.danger:disabled { border-color: var(--color-border); background: var(--color-sunken); color: var(--color-faint); }
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+  font-size: var(--icon-md);
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard);
+}
+.icon-button:hover { background: var(--color-hover); color: var(--color-ink); }
+
+/* ---- Status chips ------------------------------------------------------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-sunken);
+  color: var(--color-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+.chip.accent { background: var(--color-link-soft); color: var(--color-link); }
+.chip.attention { background: var(--color-warning-soft); color: var(--color-warning); }
+.chip.danger { background: var(--color-danger-soft); color: var(--color-danger); }
+.chip.settled { background: var(--color-success-soft); color: var(--color-success); border: 1px solid var(--color-success-rule); }
+
+/* ---- Dialogs ------------------------------------------------------------
+ *
+ * Every dialog is one column: a titled header band, a body that owns the
+ * scrolling, and an action band pinned to the bottom. Long forms then never
+ * push their own Save button off screen, and the header stays legible against
+ * the content sliding under it.
+ */
+
+dialog {
+  width: min(560px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-raised);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-prominent);
+}
+/* Scoped to [open] so a closed dialog keeps the UA's display:none. */
+dialog[open] {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
+  overflow: hidden;
+}
+dialog::backdrop { background: var(--color-scrim); }
+
+.dialog-heading {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-sunken);
+}
+.dialog-heading h2 { margin: 0; font-size: var(--text-heading); font-weight: var(--weight-semibold); letter-spacing: -0.01em; }
+.dialog-heading p { margin: var(--space-1) 0 0; max-width: 46ch; color: var(--color-muted); font-size: var(--text-caption); line-height: 1.6; }
+.dialog-heading .icon-button { flex: none; margin: -2px -6px 0 0; }
+
+.dialog-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--space-5); overscroll-behavior: contain; }
+.dialog-form { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
+.dialog-form > .dialog-body { padding: var(--space-5); }
+
+.dialog-actions {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-sidebar);
+}
+.dialog-actions .button { min-width: 84px; }
+
+/* ---- Shortcut panel ----------------------------------------------------- */
+
+.shortcut-dialog { width: min(460px, calc(100vw - 32px)); }
+.shortcut-list { display: flex; flex-direction: column; gap: var(--space-1); }
+.shortcut-row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-1) 0; font-size: var(--text-detail); }
+.shortcut-row + .shortcut-row { border-top: 1px solid var(--color-border-soft); }
+.shortcut-keys { display: inline-flex; flex: none; gap: var(--space-1); min-width: 124px; }
+.shortcut-keys kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--color-border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-ink-soft);
+  font-family: var(--font-sans);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+}
+.shortcut-label { color: var(--color-ink-soft); }
+
+/* ---- Settings form ------------------------------------------------------ */
+
+.settings-dialog { width: min(540px, calc(100vw - 32px)); }
+.settings-dialog form { padding: 0; }
+.settings-dialog .dialog-body label { display: block; margin-top: var(--space-4); color: var(--color-ink-soft); font-size: var(--text-caption); font-weight: var(--weight-semibold); }
+.settings-dialog .dialog-body label:first-child { margin-top: 0; }
+.settings-dialog .dialog-body label input,
+.settings-dialog .dialog-body label select {
+  display: block;
+  width: 100%;
+  height: 36px;
+  margin-top: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-size: var(--text-detail);
+  font-weight: var(--weight-medium);
+}
+.settings-dialog .dialog-body label input:focus,
+.settings-dialog .dialog-body label select:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 2px var(--color-accent-soft); }
+.settings-dialog label.clear-key { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2); color: var(--color-muted); font-weight: var(--weight-medium); cursor: pointer; }
+.settings-dialog label.clear-key input { display: inline-block; width: 14px; height: 14px; margin: 0; accent-color: var(--color-accent); }
+.setting-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); margin-top: var(--space-4); }
+.setting-grid label { margin-top: 0 !important; }
+.key-hint { min-height: 15px; margin-top: var(--space-1); color: var(--color-muted); font-size: var(--text-caption); }
+.model-hint { margin-top: var(--space-3); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-sidebar); color: var(--color-muted); font-size: var(--text-caption); line-height: 1.7; }
+.model-hint code { padding: 1px 4px; border-radius: var(--radius-sm); background: var(--color-sunken); color: var(--color-accent); font-family: var(--font-mono); font-size: var(--text-caption); }
+
+@media (max-width: 560px) {
+  .setting-grid { grid-template-columns: 1fr; }
+}
+
+/* ---- Feedback ----------------------------------------------------------- */
+
+.toast {
+  position: fixed;
+  right: var(--space-5);
+  bottom: var(--space-5);
+  z-index: 30;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: min(520px, calc(100vw - 48px));
+  padding: var(--space-3) var(--space-4);
+  /* The left rule names the kind of message before the text is read. */
+  border: 1px solid var(--color-inverse-rule-soft);
+  border-left: 3px solid var(--color-success);
+  border-radius: var(--radius-md);
+  background: var(--color-inverse);
+  color: var(--color-inverse-text);
+  box-shadow: var(--shadow-prominent);
+  font-size: var(--text-detail);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.toast-text { min-width: 0; padding-top: 3px; white-space: pre-line; }
+.toast.error { background: var(--color-inverse-danger); border-color: var(--color-inverse-rule); border-left-color: var(--color-danger-rule); }
+.toast-action {
+  flex: none;
+  height: 26px;
+  margin-top: 1px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-inverse-rule-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.toast-action:hover { background: var(--color-inverse-rule); }
+
+.upload-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--color-accent);
+  background: var(--color-scrim-accent);
+}
+.upload-overlay div { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-6) var(--space-6); border: 1px solid var(--color-accent-rule); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-prominent); }
+.upload-overlay span { font-size: var(--icon-xl); font-weight: var(--weight-medium); line-height: 1; }
+.upload-overlay strong { font-size: var(--text-subhead); color: var(--color-ink); }
+.upload-overlay p { margin: 0; color: var(--color-muted); font-size: var(--text-detail); }
+
 .hidden { display: none !important; }
-@keyframes pulse { 50% { opacity: .35; } }
-@keyframes translationGlow { 50% { background:#fffdf6; } }
+
+@keyframes pulse { 50% { opacity: 0.4; } }
+@keyframes translationGlow { 50% { background: var(--color-warning-soft); } }

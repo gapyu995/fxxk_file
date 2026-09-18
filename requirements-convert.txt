@@ -1,0 +1,12 @@
+# Optional conversion toolkit.
+#
+#   .\.venv\Scripts\python.exe -m pip install -r requirements-convert.txt
+#
+# The dependency-free converters (encoding/width/punctuation, table formats,
+# Chinese numerals, Markdown writing) work without this file. These four add the
+# subtitle, HTML, PDF-page and pinyin tools; every one is pure Python or ships a
+# wheel, so no system package is required.
+pysubs2==1.8.1
+markdownify==1.2.3
+pikepdf==10.13.0.post1
+pypinyin==0.55.0

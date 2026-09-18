@@ -1,8 +1,14 @@
 (function (global) {
   "use strict";
 
-  function createCompareFeature({ state, elements, api, showToast, applyFunctionTheme }) {
+  function createCompareFeature({ state, elements, api, showToast, applyFunctionTheme, diffOptions }) {
     state.compareZoom = 1;
+    state.compareDiffDocuments = [];
+
+    function diffEnabled() {
+      return Boolean(diffOptions?.().enabled);
+    }
+
     async function startFileCompare() {
       const files=[...elements.compareFilesInput.files].slice(0, 2);
       if(!files[0]||!files[1]) return;
@@ -21,23 +27,25 @@
       }
       if (elements.compareDialog.open) elements.compareDialog.close();
       elements.functionSelect.value = "compare";
-      applyFunctionTheme("compare");
-      elements.reviewWorkspace.classList.add("hidden");
-      elements.compareWorkspace.classList.remove("hidden");
+      elements.functionSelect.dispatchEvent(new Event("change"));
       elements.compareLeftTitle.textContent = pair[0].name;
       elements.compareRightTitle.textContent = pair[1].name;
       elements.compareStatus.textContent = "正在载入…";
       setCompareProgress(0, `正在准备 ${pair.length} 份文件…`);
+      state.compareDiffDocuments = [];
+      hideCompareDiff();
       try {
         for (let i = 0; i < pair.length; i++) {
           setCompareProgress(Math.round(i / pair.length * 100), `正在读取第 ${i + 1}/${pair.length} 份文件…`);
-          await renderCompareFile(pair[i], i === 0 ? elements.compareLeft : elements.compareRight);
+          const documentData = await renderCompareFile(pair[i], i === 0 ? elements.compareLeft : elements.compareRight);
+          state.compareDiffDocuments[i] = documentData || null;
           setCompareProgress(Math.round((i + 1) / pair.length * 100), `已读取第 ${i + 1}/${pair.length} 份文件`);
         }
         elements.compareStatus.textContent = "已载入，可同步滚动对比";
         setTimeout(() => elements.compareUploadProgress.classList.add("hidden"), 500);
         bindCompareScroll();
         bindCompareCanvasInteractions();
+        if (diffEnabled()) await renderCompareDiff();
       } catch (error) {
         elements.compareStatus.textContent = "载入失败";
         elements.compareUploadProgress.classList.add("hidden");
@@ -60,7 +68,7 @@
         img.className = "compare-image";
         target.append(img);
         target.dataset.kind = "image";
-        return;
+        return null;
       }
       const form = new FormData();
       form.append("file", file);
@@ -72,6 +80,7 @@
       frame.className = "compare-frame";
       target.append(frame);
       target.dataset.kind = "document";
+      return doc;
     }
 
     function setCompareZoom(value) {
@@ -118,11 +127,80 @@
       });
     }
 
+    // --- Text diff panel (jsdiff / kpdecker/jsdiff) -------------------------
+    // Uploads happen through /api/documents so both sides reuse the same
+    // server-side extraction (DOCX paragraphs, PDF layout text) that feeds
+    // translation. The diff itself runs entirely in the browser.
+
+    function hideCompareDiff() {
+      elements.compareDiffPanel?.classList.add("hidden");
+      if (elements.compareDiffSummary) elements.compareDiffSummary.textContent = "";
+      elements.compareDiffBody?.replaceChildren();
+    }
+
+    async function refreshDiff() {
+      if (!diffEnabled()) { hideCompareDiff(); return; }
+      await renderCompareDiff();
+    }
+
+    async function renderCompareDiff() {
+      const [left, right] = state.compareDiffDocuments || [];
+      if (!left || !right || !elements.compareDiffPanel) return;
+      const [leftDocument, rightDocument] = await Promise.all([
+        api(`/api/documents/${left.id}`),
+        api(`/api/documents/${right.id}`),
+      ]);
+      const leftLines = extractDiffLines(leftDocument);
+      const rightLines = extractDiffLines(rightDocument);
+      if (!leftLines.length && !rightLines.length) {
+        showToast("两份文件都没有可比较的文本。", true);
+        return;
+      }
+      const differences = global.Diff.diffLines(leftLines.join("\n"), rightLines.join("\n"));
+      const parts = [];
+      let added = 0;
+      let removed = 0;
+      for (const change of differences) {
+        const text = change.added || change.removed
+          ? String(change.value || "").replace(/\n+$/, "")
+          : String(change.value || "").replace(/\n$/, "");
+        if (!text) continue;
+        const kind = change.added ? "added" : change.removed ? "removed" : "equal";
+        if (change.added) added += text.split("\n").length;
+        if (change.removed) removed += text.split("\n").length;
+        parts.push(renderDiffBlock(text, kind));
+      }
+      elements.compareDiffBody.replaceChildren(...parts);
+      elements.compareDiffPanel.classList.remove("hidden");
+      elements.compareDiffSummary.textContent = added || removed
+        ? `新增 ${added} 行 · 删除 ${removed} 行 · 共 ${leftLines.length} / ${rightLines.length} 行`
+        : `两份文件的抽取文本完全一致（各 ${leftLines.length} 行）`;
+    }
+
+    function extractDiffLines(documentData) {
+      return (documentData.segments || [])
+        .map((segment) => (segment.source || "").replace(/\s+/g, " ").trim())
+        .filter(Boolean);
+    }
+
+    function renderDiffBlock(text, kind) {
+      const block = document.createElement("div");
+      block.className = `compare-diff-block ${kind}`;
+      const marker = document.createElement("span");
+      marker.className = "compare-diff-marker";
+      marker.textContent = kind === "added" ? "+" : kind === "removed" ? "−" : " ";
+      const body = document.createElement("pre");
+      body.className = "compare-diff-text";
+      body.textContent = text;
+      block.append(marker, body);
+      return block;
+    }
 
     return {
       start: startFileCompare,
       runFiles: runFileCompare,
       setZoom: setCompareZoom,
+      refreshDiff,
     };
   }
 

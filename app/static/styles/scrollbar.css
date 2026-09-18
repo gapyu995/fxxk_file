@@ -1,0 +1,40 @@
+/* Scrollbar skin.
+ *
+ * The only consumer of --color-scrollbar / --color-scrollbar-hover. Without
+ * it every scrolling region renders the UA scrollbar, which ignores the theme.
+ *
+ * The two paths are mutually exclusive and the gate is load-bearing: setting a
+ * non-`auto` `scrollbar-width`/`scrollbar-color` makes Chromium drop every
+ * `::-webkit-scrollbar*` rule for that element, including `:hover`. So WebKit
+ * engines take the pseudo-element path and Firefox takes the standard one.
+ */
+
+@supports not selector(::-webkit-scrollbar) {
+  /* Declared per element, not inherited from body: inheriting would pass down
+     the colour already substituted at body, so a descendant could not rebind
+     it. `scrollbar-width` is not inherited at all. */
+  body,
+  body * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-scrollbar) transparent;
+  }
+}
+
+/* Not gated in turn: an engine without these pseudo-elements drops the rules
+   as unknown selectors. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+
+/* Transparent track so the thumb reads against whatever surface scrolls under
+   it; only the thumb carries a colour. */
+::-webkit-scrollbar-track { background: transparent; }
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: var(--radius-pill);
+  background: var(--color-scrollbar);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover { background-color: var(--color-scrollbar-hover); }
+
+::-webkit-scrollbar-corner { background: transparent; }

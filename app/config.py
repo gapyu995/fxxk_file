@@ -7,6 +7,9 @@ from pathlib import Path
 
 from dotenv import dotenv_values, load_dotenv
 
+from app.services.pdf_layout import normalize_mode as normalize_pdf_mode
+from app.services.text_normalize import normalize_mode
+
 
 def _is_frozen() -> bool:
     return bool(getattr(sys, "frozen", False))
@@ -53,6 +56,8 @@ class Settings:
     host: str
     port: int
     download_dir: str
+    zh_script_mode: str = "auto"
+    pdf_layout_mode: str = "plain"
 
     @property
     def translation_configured(self) -> bool:
@@ -75,6 +80,10 @@ def get_settings() -> Settings:
         host=os.getenv("APP_HOST", "127.0.0.1").strip(),
         port=int(os.getenv("APP_PORT", "6670")),
         download_dir=os.getenv("APP_DOWNLOAD_DIR", "D:\\").strip(),
+        zh_script_mode=normalize_mode(os.getenv("TRANSLATION_ZH_SCRIPT", "auto")),
+        # "plain" is the fast pdfplumber path; "layout" rebuilds pages from word
+        # coordinates for multi-column reading order at ~2.5x the CPU cost.
+        pdf_layout_mode=normalize_pdf_mode(os.getenv("TRANSLATION_PDF_LAYOUT_MODE", "plain")),
     )
 
 
@@ -87,6 +96,7 @@ def save_translation_settings(
     batch_size: int,
     request_char_limit: int,
     max_retries: int,
+    zh_script_mode: str = "auto",
 ) -> None:
     current = dict(dotenv_values(ENV_FILE)) if ENV_FILE.exists() else {}
     current.update(
@@ -99,6 +109,7 @@ def save_translation_settings(
             "TRANSLATION_BATCH_SIZE": str(max(1, min(10, batch_size))),
             "TRANSLATION_REQUEST_CHAR_LIMIT": str(max(500, min(20000, request_char_limit))),
             "TRANSLATION_MAX_RETRIES": str(max(0, min(10, max_retries))),
+            "TRANSLATION_ZH_SCRIPT": normalize_mode(zh_script_mode),
             "APP_HOST": current.get("APP_HOST") or "127.0.0.1",
             "APP_PORT": current.get("APP_PORT") or "6670",
         }

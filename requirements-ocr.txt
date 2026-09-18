@@ -1,0 +1,9 @@
+# Optional offline OCR stack for scanned PDFs.
+#
+#   .\.venv\Scripts\python.exe -m pip install -r requirements-ocr.txt
+#
+# Everything runs locally on CPU through ONNX Runtime; no document leaves the
+# machine. This pulls ~200 MB of wheels plus the PP-OCR models, which is why it
+# is kept out of requirements.txt.
+rapidocr-onnxruntime==1.4.4
+pypdfium2==5.13.0

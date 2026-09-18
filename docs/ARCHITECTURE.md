@@ -15,10 +15,12 @@ fxxk_file/
 │     ├─ app.js               # 前端状态、事件、API 调用和工作区切换
 │     ├─ scripts/features/    # 按页面拆分的前端功能模块
 │     │  ├─ markdown.js       # Markdown 查看、编辑和实时预览
-│     │  ├─ compare.js        # 双文件对比加载和缩放
+│     │  ├─ compare.js        # 双文件对比加载、缩放和差异高亮
 │     │  └─ images.js         # 图片转换工具切换
+│     ├─ vendor/              # 内置第三方脚本（markdown-it、DOMPurify、jsdiff 等）
 │     ├─ styles.css           # CSS 入口文件，仅负责导入模块
 │     └─ styles/              # tokens、布局和各功能页面样式
+├─ tests/                     # 服务层与集成回归测试
 ├─ tools/fxxk_file.py         # 启动 FastAPI 服务
 ├─ originals/                 # 上传后的原文件
 ├─ workspace/                 # 文档状态和临时工作数据
@@ -32,6 +34,8 @@ fxxk_file/
 
 - `translate`：显示文档翻译工作区 `#reviewWorkspace`
 - `compare`：显示双文件对比工作区 `#compareWorkspace`
+- `images`：显示图片转换工作区 `#imagesWorkspace`
+- `markdown`：显示 Markdown 工作区 `#markdownWorkspace`
 
 切换逻辑位于 `app/static/app.js` 的 `bindEvents()`。新增功能时，建议为每个功能建立独立的工作区容器，并在 `functionSelect` 的 change 事件中统一切换显示状态。
 
@@ -55,7 +59,14 @@ if (value === "new-feature") {
 
 文档通过现有 `/api/documents` 上传，再使用 `/api/documents/{id}/preview` 预览；图片使用浏览器 `URL.createObjectURL()` 本地加载，不上传服务器。页面逻辑位于 `app/static/scripts/features/compare.js`，左右面板的滚动同步由 `bindCompareScroll()` 完成，缩放由 `setCompareZoom()` 完成。
 
-## 4. 新增功能的建议步骤
+勾选「高亮差异」后，`renderCompareDiff()` 会读取两份文档的 `segments[].source`（服务端统一抽取的文本，因此与翻译时使用的分段一致），在浏览器端用 jsdiff 做行级比对并渲染到 `#compareDiffPanel`；面板开关由 `diffOptions()` 回调和 `refreshDiff()` 控制，对比为只读，不修改任何文件。
+
+## 4. 内置第三方脚本与可选依赖
+
+- 前端脚本放在 `app/static/vendor/`，用普通 `<script>` 在功能模块前加载：DOMPurify（净化）、jsdiff（差异）、markdown-it 与 markdown-it-task-lists（Markdown）。详见 [前端结构说明](FRONTEND_STRUCTURE.md)。
+- 服务端可选依赖通过 `available()` 探测并写入 `/api/settings`：`pdf_layout_available`（pdfplumber）、`ocr_available`（RapidOCR + pypdfium2）、`zh_script_available`（zhconv）。前端据此禁用「扫描件自动 OCR」「译文中文」等控件，缺失依赖不会让已有功能报错。详见 [后端结构说明](BACKEND_STRUCTURE.md)。
+
+## 5. 新增功能的建议步骤
 
 1. 在 `index.html` 增加功能选项和独立工作区。
 2. 在 `app.js` 的 `elements` 中注册 DOM 元素。
@@ -66,7 +77,7 @@ if (value === "new-feature") {
 7. 页面级 JavaScript 放入 `scripts/features/`，由 `app.js` 负责注入共享状态和编排调用。
 8. 更新本文件和 `docs/USER_GUIDE.md`，说明用户操作方法。
 
-## 5. 配置与启动
+## 6. 配置与启动
 
 服务地址由 `.env` 中的 `APP_HOST` 和 `APP_PORT` 控制，当前默认端口为 `6670`。启动入口是 `start.ps1`，开发时也可以直接运行：
 
@@ -76,7 +87,7 @@ if (value === "new-feature") {
 
 修改前端后无需重新构建；刷新浏览器即可看到静态文件变化。修改 Python 后需要重启服务。
 
-## 6. 修改检查清单
+## 7. 修改检查清单
 
 - 新功能是否能从顶部菜单进入和退出？
 - 是否不会影响已有文档翻译工作区？
@@ -84,4 +95,8 @@ if (value === "new-feature") {
 - 是否避免把不必要的文件上传到服务器？
 - 是否更新使用说明和本结构文档？
 - 是否运行 `node --check app/static/app.js` 检查前端语法？
+- 是否运行 `.\.venv\Scripts\python.exe -m pytest tests -q` 回归服务层行为？
+- 新增的第三方脚本是否放在 `app/static/vendor/` 并附带 `*.LICENSE.txt`？
+- 新增的 Python 可选依赖是否提供 `available()` 探测，并在缺少时优雅降级？
+
 Backend routes and services are now split by responsibility. See [BACKEND_STRUCTURE.md](BACKEND_STRUCTURE.md) for the module map and CI/CD checks.

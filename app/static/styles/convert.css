@@ -1,0 +1,145 @@
+﻿/* File conversion workspace.
+ *
+ * A tool picker on the left, the active tool's fields in the middle, and the
+ * result on the right. Every group shares one form language: a select for the
+ * operation, file inputs where a file is genuinely required, and a textarea for
+ * anything that can be pasted.
+ */
+
+.convert-workspace { position: absolute; inset: 56px 0 0 272px; z-index: 6; display: flex; flex-direction: column; background: var(--color-canvas); }
+
+.convert-toolbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.convert-toolbar-title { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.convert-toolbar-title > div { min-width: 0; }
+.convert-toolbar-title strong { display: block; overflow: hidden; font-size: var(--text-body); font-weight: var(--weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
+.convert-toolbar-title span:last-child { display: block; margin-top: 2px; overflow: hidden; color: var(--color-muted); font-size: var(--text-caption); text-overflow: ellipsis; white-space: nowrap; }
+.convert-mark { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: var(--radius-sm); background: var(--color-accent); color: var(--color-primary-text); font-size: var(--text-body); }
+.convert-toolbar-actions { display: flex; align-items: center; gap: var(--space-2); }
+
+.convert-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: var(--space-4); padding: var(--space-4) var(--space-5) var(--space-5); overflow: hidden; }
+
+/* ---- Tool picker -------------------------------------------------------- */
+
+.convert-groups { display: flex; flex-direction: column; gap: 2px; margin-bottom: var(--space-4); }
+.convert-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink-soft);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard);
+}
+.convert-group strong { font-size: var(--text-detail); font-weight: var(--weight-semibold); }
+.convert-group span { color: var(--color-muted); font-size: var(--text-caption); }
+.convert-group:hover:not(:disabled) { background: var(--color-sunken); }
+.convert-group[aria-pressed="true"] { border-color: var(--color-accent-rule); background: var(--color-accent-soft); color: var(--color-accent); }
+.convert-group[aria-pressed="true"] span { color: var(--color-accent); }
+.convert-group:disabled { cursor: not-allowed; opacity: 0.55; }
+
+/* ---- Panels ------------------------------------------------------------- */
+
+/* The active panel fills the card and its textarea absorbs the leftover
+   height, so a short form never leaves a large empty sheet. */
+.convert-panels { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: var(--space-5); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); overflow: auto; }
+.convert-panel { flex: 1 1 auto; display: flex; flex-direction: column; gap: var(--space-3); min-height: 0; }
+.convert-panel h2 { margin: 0; font-size: var(--text-subhead); font-weight: var(--weight-semibold); }
+.convert-hint { margin: 0; max-width: 72ch; color: var(--color-muted); font-size: var(--text-caption); line-height: 1.7; }
+.convert-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3); }
+
+.convert-panel label { display: flex; flex-direction: column; gap: var(--space-2); color: var(--color-ink-soft); font-size: var(--text-caption); font-weight: var(--weight-semibold); }
+/* The pasted-content field is the only optional-height control in a panel, so
+   it takes whatever room the fixed fields leave. */
+.convert-grow { flex: 1 1 auto; min-height: 0; }
+.convert-grow textarea { flex: 1 1 auto; min-height: 120px; }
+.convert-panel input[type="text"],
+.convert-panel select,
+.convert-panel textarea {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-detail);
+  font-weight: var(--weight-medium);
+}
+.convert-panel textarea { flex: 1 1 auto; min-height: 96px; font-family: var(--font-mono); font-size: var(--text-detail); line-height: 1.6; resize: vertical; }
+.convert-panel input[type="text"]:focus,
+.convert-panel select:focus,
+.convert-panel textarea:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 2px var(--color-accent-soft); }
+.convert-panel input[type="file"] { padding: var(--space-2); border: 1px dashed var(--color-border-strong); border-radius: var(--radius-sm); background: var(--color-sidebar); color: var(--color-muted); font-size: var(--text-caption); font-weight: var(--weight-medium); }
+.convert-panel input[type="file"]::file-selector-button {
+  margin-right: var(--space-2);
+  padding: 5px var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-ink-soft);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+/* ---- Result ------------------------------------------------------------- */
+
+.convert-side { display: flex; flex-direction: column; gap: var(--space-3); min-height: 0; }
+.convert-status { min-height: 16px; padding-left: var(--space-4); color: var(--color-muted); font-size: var(--text-caption); }
+.convert-status.busy { position: relative; color: var(--color-accent); }
+.convert-status.busy::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  animation: pulse var(--motion-pulse) var(--ease-standard) infinite;
+}
+.convert-action { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-sidebar); }
+.convert-action .button.primary { height: 34px; }
+.convert-action-hint { margin: 0; color: var(--color-muted); font-size: var(--text-caption); line-height: 1.6; }
+.convert-result { display: flex; flex-direction: column; gap: var(--space-2); min-height: 0; flex: 1; padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.convert-result-head { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); }
+.convert-result-head strong { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-detail); }
+.convert-result-head strong::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--color-success); }
+.convert-stats { color: var(--color-muted); font-size: var(--text-caption); font-variant-numeric: tabular-nums; }
+.convert-result textarea { flex: 1; min-height: 160px; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-sidebar); color: var(--color-ink); font-family: var(--font-mono); font-size: var(--text-detail); line-height: 1.6; resize: none; }
+.convert-result textarea:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 2px var(--color-accent-soft); }
+.convert-files { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.convert-result-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); padding-top: var(--space-3); border-top: 1px solid var(--color-border-soft); }
+.convert-result-actions .button { height: 28px; font-size: var(--text-caption); }
+/* File results (DOCX / PDF / ZIP) have nothing to copy, so the card shows the
+   title and the download buttons only — an empty textarea would read as a
+   failed conversion. */
+.convert-result.file-only textarea,
+.convert-result.file-only #convertCopy,
+.convert-result.file-only #convertSave { display: none; }
+/* A download-only result hugs its content instead of stretching to the full
+   column, which would read as an empty panel waiting for input. */
+.convert-result.file-only { flex: 0 0 auto; }
+.convert-result.file-only .convert-files .button { height: 34px; font-size: var(--text-detail); }
+
+@media (max-width: 1180px) {
+  .convert-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; overflow: auto; }
+  .convert-side { min-height: 0; }
+}
