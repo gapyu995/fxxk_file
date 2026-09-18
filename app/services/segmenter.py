@@ -2,10 +2,20 @@ from __future__ import annotations
 
 import re
 
+try:  # Optional: rule-based sentence boundary detection (MIT, nipunsadvilkar/pySBD).
+    import pysbd
+except Exception:  # pragma: no cover - optional dependency guard
+    pysbd = None
+
 
 CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
 CJK_BOUNDARY_RE = re.compile(r"[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]")
 SENTENCE_BOUNDARY_RE = re.compile(r"(?<=[。！？!?；;])|(?<=[.!?])(?=\s+[A-Z0-9\"'])")
+
+# pySBD is pure Python and builds rule tables per language, so the segmenters
+# are cached instead of being rebuilt for every long paragraph.
+_PYSBD_LANGUAGES = {"en", "zh"}
+_segmenters: dict[str, object] = {}
 
 
 def detect_language(text: str) -> str:
@@ -31,7 +41,7 @@ def split_into_segments(paragraphs: list[str], max_chars: int = 1200) -> list[st
 
 
 def _split_long_text(text: str, max_chars: int) -> list[str]:
-    sentences = [part.strip() for part in SENTENCE_BOUNDARY_RE.split(text) if part.strip()]
+    sentences = split_sentences(text)
     chunks: list[str] = []
     current = ""
     for sentence in sentences:
@@ -50,6 +60,43 @@ def _split_long_text(text: str, max_chars: int) -> list[str]:
     if current:
         chunks.append(current)
     return chunks or [text]
+
+
+def split_sentences(text: str) -> list[str]:
+    """Split text into sentences, preferring pySBD over the regex fallback.
+
+    The regex boundary rule mis-handles abbreviations ("Dr."), decimals ("2.1")
+    and list numbering; pySBD applies language rules for English and Chinese.
+    Anything unexpected falls back to the previous regex behaviour so long
+    paragraphs are always chunkable.
+    """
+    value = str(text or "")
+    if pysbd is not None:
+        language = _sentence_language(value)
+        segmenter = _segmenter_for(language)
+        if segmenter is not None:
+            try:
+                parts = [part.strip() for part in segmenter.segment(value) if part.strip()]
+                if parts:
+                    return parts
+            except Exception:
+                pass
+    return [part.strip() for part in SENTENCE_BOUNDARY_RE.split(value) if part.strip()]
+
+
+def _segmenter_for(language: str):
+    if language not in _PYSBD_LANGUAGES:
+        return None
+    if language not in _segmenters:
+        try:
+            _segmenters[language] = pysbd.Segmenter(language=language, clean=False)
+        except Exception:
+            _segmenters[language] = None
+    return _segmenters[language]
+
+
+def _sentence_language(text: str) -> str:
+    return "zh" if detect_language(text) == "zh" else "en"
 
 
 def join_lines(lines: list[str]) -> str:

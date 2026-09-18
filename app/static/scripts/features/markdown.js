@@ -1,7 +1,10 @@
 (function (global) {
   "use strict";
 
-  function createMarkdownFeature({ state, elements, showToast, applyFunctionTheme }) {
+  function createMarkdownFeature({ state, elements, showToast, applyFunctionTheme, onContentChange }) {
+    const notifyContentChange = () => {
+      if (typeof onContentChange === "function") onContentChange();
+    };
     function isMarkdownFile(file) {
       return Boolean(file && /\.(md|markdown|mdown|mkdn|txt)$/i.test(file.name || ""));
     }
@@ -14,12 +17,7 @@
       }
       if (elements.functionSelect.value !== "markdown") {
         elements.functionSelect.value = "markdown";
-        elements.functionTrigger.firstChild.textContent = "Markdown 查看 ";
-        applyFunctionTheme("markdown");
-        elements.reviewWorkspace.classList.add("hidden");
-        elements.compareWorkspace.classList.add("hidden");
-        elements.imagesWorkspace.classList.add("hidden");
-        elements.markdownWorkspace.classList.remove("hidden");
+        elements.functionSelect.dispatchEvent(new Event("change"));
       }
       try {
         elements.markdownStatus.textContent = "正在读取文件…";
@@ -41,12 +39,12 @@
       if (Number.isFinite(file?.size)) state.markdownFileSize = file.size;
       if (elements.markdownEditor.value !== source) elements.markdownEditor.value = source;
       const parsed = markdownToHtml(source);
-      elements.markdownRendered.innerHTML = parsed.html;
+      renderMarkdownInto(elements.markdownRendered, parsed);
       elements.markdownRendered.classList.remove("hidden");
       elements.markdownEmpty.classList.add("hidden");
       elements.markdownEditor.classList.add("hidden");
       elements.markdownContent.classList.remove("markdown-editing");
-      elements.markdownEditToggle.textContent = "缂栬緫 Markdown";
+      elements.markdownEditToggle.textContent = "编辑 Markdown";
       elements.markdownEditToggle.setAttribute("aria-pressed", "false");
       elements.markdownFileMeta.textContent = `${file.name} · ${formatMarkdownBytes(file.size)} · ${parsed.lineCount} 行`;
       elements.markdownStatus.textContent = `${parsed.wordCount.toLocaleString()} 个字符 · ${parsed.headingCount} 个标题 · ${parsed.tableCount} 个表格`;
@@ -54,12 +52,13 @@
       setMarkdownFontScale(state.markdownFontScale, false);
       updateMarkdownLayout();
       updateMarkdownStickyHeading();
+      notifyContentChange();
     }
 
     function updateMarkdownPreview(source, statusSuffix = "") {
       const previousRatio = state.markdownEditMode ? markdownScrollRatio(elements.markdownRendered) : null;
       const parsed = markdownToHtml(source);
-      elements.markdownRendered.innerHTML = parsed.html;
+      renderMarkdownInto(elements.markdownRendered, parsed);
       elements.markdownRendered.classList.remove("hidden");
       elements.markdownEmpty.classList.add("hidden");
       elements.markdownFileMeta.textContent = `${state.markdownFileName} · ${formatMarkdownBytes(state.markdownFileSize)} · ${parsed.lineCount} 行`;
@@ -74,6 +73,7 @@
           updateMarkdownStickyHeading();
         });
       }
+      notifyContentChange();
     }
 
     function toggleMarkdownEdit() {
@@ -102,6 +102,7 @@
 
     function handleMarkdownEditorInput() {
       state.markdownSource = elements.markdownEditor.value;
+      notifyContentChange();
       elements.markdownStatus.textContent = "正在编辑 · 预览会自动更新…";
       clearTimeout(state.markdownEditTimer);
       state.markdownEditTimer = setTimeout(() => updateMarkdownPreview(state.markdownSource, "实时预览"), 180);
@@ -166,146 +167,190 @@
       return "#";
     }
 
+    // Inline Markdown for the emergency fallback renderer only. The normal path
+    // is markdown-it, so this only has to keep the old behaviour alive if the
+    // vendored engine is unavailable.
     function markdownInline(value) {
       let output = escapeMarkdownHtml(value);
-      const tokens = [];
-      const token = (html) => {
-        const marker = `\u0000MD${tokens.length}\u0000`;
-        tokens.push(html);
-        return marker;
-      };
-      output = output.replace(/!\[([^\]]*)\]\((\S+?)(?:\s+["']([^"']*)["'])?\)/g, (_, alt, url, title) => {
-        const safeUrl = safeMarkdownUrl(url);
-        if (safeUrl === "#") return escapeMarkdownHtml(alt || "图片");
-        const titleAttr = title ? ` title="${escapeMarkdownHtml(title)}"` : "";
-        return token(`<img src="${escapeMarkdownHtml(safeUrl)}" alt="${escapeMarkdownHtml(alt)}"${titleAttr} loading="lazy">`);
-      });
+      output = output.replace(/!\[([^\]]*)\]\((\S+?)(?:\s+["']([^"']*)["'])?\)/g, (_, alt) => escapeMarkdownHtml(alt || "图片"));
       output = output.replace(/\[([^\]]+)\]\((\S+?)(?:\s+["']([^"']*)["'])?\)/g, (_, label, url, title) => {
         const safeUrl = safeMarkdownUrl(url);
         if (safeUrl === "#") return label;
         const titleAttr = title ? ` title="${escapeMarkdownHtml(title)}"` : "";
-        return token(`<a href="${escapeMarkdownHtml(safeUrl)}" target="_blank" rel="noopener noreferrer"${titleAttr}>${label}</a>`);
+        return `<a href="${escapeMarkdownHtml(safeUrl)}" target="_blank" rel="noopener noreferrer"${titleAttr}>${label}</a>`;
       });
-      output = output.replace(/`([^`\n]+)`/g, (_, code) => token(`<code>${code}</code>`));
+      output = output.replace(/`([^`\n]+)`/g, (_, code) => `<code>${code}</code>`);
       output = output.replace(/\*\*([^*\n]+)\*\*|__([^_\n]+)__/g, (_, boldA, boldB) => `<strong>${boldA || boldB}</strong>`);
       output = output.replace(/~~([^~\n]+)~~/g, "<del>$1</del>");
       output = output.replace(/\*([^*\n]+)\*|_([^_\n]+)_/g, (_, italicA, italicB) => `<em>${italicA || italicB}</em>`);
-      output = output.replace(/(^|\s)(https?:\/\/[^\s<]+)/g, (_, prefix, url) => `${prefix}${token(`<a href="${escapeMarkdownHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeMarkdownHtml(url)}</a>`)}`);
-      return output.replace(/\u0000MD(\d+)\u0000/g, (_, index) => tokens[Number(index)] || "");
+      output = output.replace(/(^|\s)(https?:\/\/[^\s<]+)/g, (_, prefix, url) => `${prefix}<a href="${escapeMarkdownHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeMarkdownHtml(url)}</a>`);
+      return output;
     }
 
-    function markdownSoftBreakSeparator(previousLine, nextLine) {
-      const previous = String(previousLine || "").trimEnd();
-      const next = String(nextLine || "").trimStart();
-      if (!previous || !next) return "";
-      // Markdown treats a single source newline as whitespace. Avoid inserting
-      // visible spaces between CJK characters while keeping English words apart.
-      if (/[\u3400-\u9fff]$/.test(previous) || /^[\u3400-\u9fff]/.test(next)) return "";
-      return " ";
-    }
+    // --- markdown-it engine (markdown-it/markdown-it) ----------------------
+    // The previous hand-written parser handled a friendly subset of GFM. The
+    // vendored markdown-it build replaces it with a spec-complete parser, while
+    // everything downstream of `markdownToHtml` (TOC structure, table wrappers
+    // and the column-resize feature) keeps its existing DOM contract.
 
-    function renderMarkdownParagraph(lines) {
-      return lines.map((line, index) => {
-        const hardBreak = /(?: {2,}|\\)$/.test(line);
-        const cleanLine = line.replace(/ {2,}$/, "").replace(/\\$/, "");
-        const separator = index === lines.length - 1
-          ? ""
-          : hardBreak
-            ? "<br>"
-            : markdownSoftBreakSeparator(line, lines[index + 1]);
-        return markdownInline(cleanLine) + separator;
-      }).join("");
-    }
+    const MARKDOWN_IT_OPTIONS = {
+      html: false,          // raw HTML in the source stays escaped, as before
+      linkify: true,        // bare URLs become links (previous behaviour)
+      breaks: false,        // soft breaks keep Markdown semantics
+      typographer: false,
+      langPrefix: "language-",
+    };
 
-    function splitMarkdownTableRow(line) {
-      let value = String(line || "").trim();
-      if (value.startsWith("|")) value = value.slice(1);
-      if (value.endsWith("|")) value = value.slice(0, -1);
-      const cells = [];
-      let current = "";
-      let escaped = false;
-      let codeSpanLength = 0;
-      for (let index = 0; index < value.length; index += 1) {
-        const char = value[index];
-        // A pipe inside inline code is content, not a column boundary. This
-        // is common in command examples such as `` `a|b` `` and used to make
-        // otherwise valid tables appear malformed.
-        if (char === "`" && !escaped) {
-          let runLength = 1;
-          while (value[index + runLength] === "`") runLength += 1;
-          if (!codeSpanLength) codeSpanLength = runLength;
-          else if (codeSpanLength === runLength) codeSpanLength = 0;
-          current += "`".repeat(runLength);
-          index += runLength - 1;
-          continue;
-        }
-        if (char === "|" && !escaped && !codeSpanLength) {
-          cells.push(current.trim().replace(/\\\|/g, "|"));
-          current = "";
-          continue;
-        }
-        if (char === "\\" && !escaped) { escaped = true; current += char; continue; }
-        escaped = false;
-        current += char;
+    // URIs the previous renderer allowed. Anything else (`javascript:`, remote
+    // data URLs, unknown schemes) is rejected before sanitising.
+    const SAFE_MARKDOWN_LINK = /^(?:https?:|mailto:|#|\/|\.{1,2}\/)/i;
+
+    let markdownEngine = null;
+
+    function getMarkdownEngine() {
+      if (markdownEngine) return markdownEngine;
+      if (typeof global.markdownit !== "function") return null;
+      const engine = global.markdownit(MARKDOWN_IT_OPTIONS);
+      if (typeof global.markdownitTaskLists === "function") {
+        engine.use(global.markdownitTaskLists, { enabled: false, label: true });
       }
-      cells.push(current.trim().replace(/\\\|/g, "|"));
-      return cells;
+      markdownEngine = engine;
+      return engine;
     }
 
-    function isMarkdownTableSeparator(line) {
-      const cells = splitMarkdownTableRow(line);
-      // Accept short (two-dash) delimiters and whitespace around alignment
-      // colons so hand-written tables are not silently downgraded to prose.
-      return cells.length > 0 && cells.every((cell) => /^:?\s*-{2,}\s*:?$/.test(cell.trim()));
+    function renderWithEngine(source) {
+      const engine = getMarkdownEngine();
+      if (!engine) return null;
+      const raw = engine.render(String(source || "").replace(/^\uFEFF/, ""));
+      const safe = sanitizeMarkdownHtml(raw);
+      return applyMarkdownDomContract(safe);
     }
 
-    function findMarkdownTableSeparatorIndex(lines, headerIndex) {
-      const headerLine = lines[headerIndex];
-      if (!headerLine || !headerLine.includes("|")) return -1;
-      let separatorIndex = headerIndex + 1;
-      // A blank line between the header and delimiter is tolerated by a
-      // number of Markdown renderers. Only skip one line to avoid consuming
-      // unrelated content.
-      if (separatorIndex < lines.length && !lines[separatorIndex].trim()) separatorIndex += 1;
-      const separatorLine = lines[separatorIndex];
-      if (!separatorLine || !separatorLine.includes("|")) return -1;
-      if (!isMarkdownTableSeparator(separatorLine)) return -1;
-      const headerColumns = splitMarkdownTableRow(headerLine).length;
-      // Delimiter/header column counts are intentionally not required to
-      // match. Real-world hand-written tables often omit a trailing delimiter
-      // cell; missing alignment metadata simply falls back to default styling.
-      return headerColumns >= 1 ? separatorIndex : -1;
-    }
-
-    function renderMarkdownTable(headerLine, separatorLine, rowLines) {
-      const headers = splitMarkdownTableRow(headerLine);
-      const separators = splitMarkdownTableRow(separatorLine);
-      const alignments = headers.map((_, index) => {
-        const cell = separators[index] || "";
-        return cell.startsWith(":") && cell.endsWith(":") ? "center" : cell.startsWith(":") ? "left" : cell.endsWith(":") ? "right" : "";
+    function sanitizeMarkdownHtml(html) {
+      const purify = global.DOMPurify;
+      if (!purify || typeof purify.sanitize !== "function") return html;
+      return purify.sanitize(html, {
+        USE_PROFILES: { html: true },
+        ADD_ATTR: ["target", "rel", "align", "type", "checked", "disabled"],
+        // markdown-it emits `style="text-align:…"` for aligned table columns and
+        // task-list inputs for `- [x]`; both are part of the rendered contract.
+        ADD_TAGS: ["input", "col", "colgroup"],
+        ALLOW_DATA_ATTR: false,
+        FORBID_TAGS: ["form"],
+        FORBID_ATTR: ["srcset", "onerror", "onload", "formaction"],
       });
-      const head = headers.map((cell, index) => `<th${alignments[index] ? ` style="text-align:${alignments[index]}"` : ""}>${markdownInline(cell)}</th>`).join("");
-      const rows = rowLines.map((line) => {
-        const cells = splitMarkdownTableRow(line);
-        while (cells.length < headers.length) cells.push("");
-        return `<tr>${headers.map((_, index) => `<td${alignments[index] ? ` style="text-align:${alignments[index]}"` : ""}>${markdownInline(cells[index] || "")}</td>`).join("")}</tr>`;
-      }).join("");
-      const rowCount = rowLines.length;
-      return `<div class="markdown-table-wrap" data-row-count="${rowCount}" data-column-count="${headers.length}"><div class="markdown-table-caption"><span>表格</span><span>${rowCount} 行 · ${headers.length} 列</span></div><table aria-rowcount="${rowCount + 1}"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+
+    function parseSanitizedFragment(html) {
+      const template = document.createElement("template");
+      template.innerHTML = html;
+      return template.content;
+    }
+
+    function applyMarkdownDomContract(html) {
+      const fragment = parseSanitizedFragment(html);
+      const toc = [];
+      const headings = fragment.querySelectorAll("h1, h2, h3, h4, h5, h6");
+      headings.forEach((heading, index) => {
+        const id = `markdown-heading-${index + 1}`;
+        heading.id = id;
+        toc.push({
+          id,
+          level: Number(heading.tagName.slice(1)),
+          text: (heading.textContent || "").trim(),
+        });
+      });
+      applyMarkdownLinkPolicy(fragment);
+      const tableCount = wrapMarkdownTables(fragment);
+      return { fragment, toc, headingCount: headings.length, tableCount };
+    }
+
+    function applyMarkdownLinkPolicy(fragment) {
+      fragment.querySelectorAll("a[href]").forEach((link) => {
+        const href = link.getAttribute("href") || "";
+        if (!SAFE_MARKDOWN_LINK.test(href.trim())) {
+          // Never let a document define a javascript: or unknown-scheme target.
+          link.replaceWith(document.createTextNode(link.textContent || ""));
+          return;
+        }
+        if (!href.trim().startsWith("#")) {
+          link.setAttribute("target", "_blank");
+          link.setAttribute("rel", "noopener noreferrer");
+        }
+      });
+    }
+
+    function wrapMarkdownTables(fragment) {
+      let count = 0;
+      fragment.querySelectorAll("table").forEach((table) => {
+        // Tables without an explicit <thead> come from delimiters the previous
+        // parser rejected; wrap them so styling and column resizing still apply.
+        const wrap = document.createElement("div");
+        wrap.className = "markdown-table-wrap";
+        const columnCount = table.querySelectorAll("thead th").length
+          || table.querySelector("tbody tr")?.children.length
+          || 0;
+        const rowCount = table.querySelectorAll("tbody tr").length;
+        wrap.dataset.rowCount = String(rowCount);
+        wrap.dataset.columnCount = String(columnCount);
+        const caption = document.createElement("div");
+        caption.className = "markdown-table-caption";
+        const captionLabel = document.createElement("span");
+        captionLabel.textContent = "表格";
+        const captionMeta = document.createElement("span");
+        captionMeta.textContent = `${rowCount} 行 · ${columnCount} 列`;
+        caption.append(captionLabel, captionMeta);
+        table.setAttribute("aria-rowcount", String(rowCount + (table.querySelector("thead") ? 1 : 0)));
+        const colgroup = document.createElement("colgroup");
+        for (let index = 0; index < columnCount; index += 1) {
+          const col = document.createElement("col");
+          col.dataset.colIndex = String(index);
+          colgroup.append(col);
+        }
+        table.prepend(colgroup);
+        table.replaceWith(wrap);
+        wrap.append(caption, table);
+        count += 1;
+      });
+      return count;
     }
 
     function markdownToHtml(source) {
+      const text = String(source || "");
+      const rendered = renderWithEngine(text);
+      const lineCount = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n").length;
+      const wordCount = text.replace(/\s/g, "").length;
+      if (rendered) {
+        return {
+          fragment: rendered.fragment,
+          toc: rendered.toc,
+          headingCount: rendered.headingCount,
+          tableCount: rendered.tableCount,
+          wordCount,
+          lineCount,
+          engine: "markdown-it",
+        };
+      }
+      // Fallback kept only for the (unexpected) case where the vendored engine
+      // failed to load; it renders the same shapes the DOM contract expects.
+      const fallback = markdownToHtmlLegacy(text);
+      return { ...fallback, fragment: parseSanitizedFragment(fallback.html), wordCount, lineCount, engine: "legacy" };
+    }
+
+    function renderMarkdownInto(target, parsed) {
+      target.replaceChildren(parsed.fragment);
+    }
+
+    function markdownToHtmlLegacy(source) {
       const lines = String(source || "").replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n");
       const toc = [];
       let html = "";
       let headingCount = 0;
-      let tableCount = 0;
       let wordCount = 0;
       let i = 0;
       const blockStart = (index) => {
         const line = lines[index];
-        return /^(?:#{1,6}\s|```|~~~|>|[-*+]\s+|\d+[.)]\s+|---+\s*$|\*\*\*+\s*$)/.test(line)
-          || findMarkdownTableSeparatorIndex(lines, index) !== -1;
+        return /^(?:#{1,6}\s|```|~~~|>|[-*+]\s+|\d+[.)]\s+|---+\s*$|\*\*\*+\s*$)/.test(line);
       };
       while (i < lines.length) {
         const line = lines[i];
@@ -334,16 +379,6 @@
           continue;
         }
         if (/^\s*(?:---+|\*\*\*+|___+)\s*$/.test(line)) { html += "<hr>"; i += 1; continue; }
-        const separatorIndex = findMarkdownTableSeparatorIndex(lines, i);
-        if (separatorIndex !== -1) {
-          const separatorLine = lines[separatorIndex];
-          const rowLines = [];
-          i = separatorIndex + 1;
-          while (i < lines.length && lines[i].trim() && lines[i].includes("|")) { rowLines.push(lines[i]); i += 1; }
-          html += renderMarkdownTable(line, separatorLine, rowLines);
-          tableCount += 1;
-          continue;
-        }
         if (/^\s*>/.test(line)) {
           const quoteLines = [];
           while (i < lines.length && /^\s*>/.test(lines[i])) { quoteLines.push(lines[i].replace(/^\s*>\s?/, "")); i += 1; }
@@ -369,16 +404,44 @@
         const paragraph = [line];
         i += 1;
         while (i < lines.length && lines[i].trim() && !blockStart(i)) { paragraph.push(lines[i]); i += 1; }
-        html += `<p>${renderMarkdownParagraph(paragraph)}</p>`;
+        html += `<p>${renderMarkdownSequence(paragraph)}</p>`;
       }
       wordCount = String(source || "").replace(/\s/g, "").length;
-      return { html, toc, headingCount, tableCount, wordCount, lineCount: lines.length };
+      return { html, toc, headingCount, tableCount: 0, wordCount, lineCount: lines.length };
+    }
+
+    function renderMarkdownSequence(lines) {
+      return lines.map((line, index) => {
+        const hardBreak = /(?: {2,}|\\)$/.test(line);
+        const cleanLine = line.replace(/ {2,}$/, "").replace(/\\$/, "");
+        const separator = index === lines.length - 1
+          ? ""
+          : hardBreak
+            ? "<br>"
+            : markdownSoftBreakSeparator(line, lines[index + 1]);
+        return markdownInline(cleanLine) + separator;
+      }).join("");
+    }
+
+    function markdownSoftBreakSeparator(previousLine, nextLine) {
+      const previous = String(previousLine || "").trimEnd();
+      const next = String(nextLine || "").trimStart();
+      if (!previous || !next) return "";
+      // Markdown treats a single source newline as whitespace. Avoid inserting
+      // visible spaces between CJK characters while keeping English words apart.
+      if (/[\u3400-\u9fff]$/.test(previous) || /^[\u3400-\u9fff]/.test(next)) return "";
+      return " ";
     }
 
     function renderMarkdownToc(toc) {
       elements.markdownTocList.replaceChildren();
+      state.markdownTocItems = toc.map((item) => item.id);
       if (!toc.length) {
-        elements.markdownTocList.innerHTML = '<span class="markdown-toc-empty">文档中没有标题</span>';
+        const empty = document.createElement("span");
+        empty.className = "markdown-toc-empty";
+        empty.textContent = "文档中没有标题";
+        elements.markdownTocList.append(empty);
+        if (elements.markdownTocCurrent) elements.markdownTocCurrent.textContent = "";
         return;
       }
       const fragment = document.createDocumentFragment();
@@ -388,6 +451,7 @@
         link.textContent = item.text;
         link.className = `toc-level-${Math.min(3, item.level)}`;
         link.dataset.target = item.id;
+        link.title = item.text;
         link.addEventListener("click", (event) => {
           event.preventDefault();
           document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -410,6 +474,9 @@
       state.markdownTableFit = !state.markdownTableFit;
       elements.markdownTableFit.classList.toggle("active", state.markdownTableFit);
       elements.markdownTableFit.setAttribute("aria-pressed", String(state.markdownTableFit));
+      // Manual column widths conflict with the fit toggle, so switching it
+      // clears every manually resized table back to auto layout.
+      clearAllManualTableWidths();
       updateMarkdownLayout();
     }
 
@@ -419,6 +486,10 @@
       elements.markdownRendered.querySelectorAll(".markdown-table-wrap").forEach((wrap) => {
         const table = wrap.querySelector("table");
         if (!table) return;
+        // Manually resized tables keep their widths on resize/re-render paths
+        // (window resize, font scale, layout updates) until the document is
+        // re-rendered, which rebuilds innerHTML and clears the marker.
+        if (table.classList.contains("manual-col-widths")) return;
         const columns = Number(wrap.dataset.columnCount || table.querySelectorAll("thead th").length || 0);
         const wide = columns >= 6 || (columns >= 5 && available < 700);
         wrap.classList.toggle("wide-table", wide);
@@ -428,26 +499,170 @@
       });
     }
 
+    // --- Manual table column width resizing (session-only) ---
+    // Dragging a header cell's right edge resizes that column and its right
+    // neighbour by the same delta, keeping the table at 100% width. Widths are
+    // written to <col> elements; unset columns share the remaining space via
+    // table-layout:fixed. Re-rendering rebuilds innerHTML, clearing all manual
+    // widths back to the default layout.
+
+    const MIN_COLUMN_WIDTH = 80; // keep in sync with markdown.css th/td min-width
+
+    let columnDrag = null;
+
+    function findColumnResizeTarget(event, checkPointer = true) {
+      if (event.button !== 0) return null;
+      if (checkPointer && event.pointerType !== "mouse") return null;
+      const th = event.target.closest?.("thead th");
+      if (!th || !th.closest(".markdown-table-wrap")) return null;
+      const table = th.closest("table");
+      if (!table) return null;
+      const headers = table.querySelectorAll("thead th");
+      const colIndex = Array.prototype.indexOf.call(headers, th);
+      if (colIndex < 0 || colIndex >= headers.length - 1) return null; // no grip on the last column / single-column table
+      if (th.getBoundingClientRect().right - event.clientX > 8) return null; // must hit the right-edge grip
+      return { table, colIndex };
+    }
+
+    function startColumnDrag(event, { table, colIndex }) {
+      const cols = table.querySelectorAll("col");
+      const col = cols[colIndex];
+      const neighbor = cols[colIndex + 1];
+      if (!col || !neighbor) return;
+      // Switch to fixed layout on pointerdown (not on release) so the width
+      // changes apply pixel-perfect while dragging even on no-fit/wide tables
+      // that normally use table-layout:auto.
+      table.classList.add("manual-col-widths");
+      const headers = table.querySelectorAll("thead th");
+      columnDrag = {
+        table, colIndex, pointerId: event.pointerId,
+        col, neighbor, th: headers[colIndex],
+        startX: event.clientX,
+        startLeft: headers[colIndex].getBoundingClientRect().width,
+        startRight: headers[colIndex + 1].getBoundingClientRect().width,
+      };
+      columnDrag.th.classList.add("is-resizing");
+      document.body.classList.add("resizing-column");
+      elements.markdownRendered.setPointerCapture(event.pointerId);
+    }
+
+    function moveColumnDrag(event) {
+      if (!columnDrag) return;
+      // Edit-mode preview re-renders (180ms debounce) can rebuild innerHTML
+      // mid-drag, detaching the captured <col> elements; abort silently.
+      if (!columnDrag.table.isConnected || !columnDrag.col.isConnected) {
+        endColumnDrag();
+        return;
+      }
+      const dx = event.clientX - columnDrag.startX;
+      // Keep the dragged pair's total width constant: cap dx so the right
+      // neighbour never drops below its minimum, otherwise unset columns
+      // would be squeezed below their floor and the table would overflow.
+      const cappedDx = Math.min(dx, columnDrag.startRight - MIN_COLUMN_WIDTH);
+      columnDrag.col.style.width = `${Math.max(MIN_COLUMN_WIDTH, columnDrag.startLeft + cappedDx)}px`;
+      columnDrag.neighbor.style.width = `${Math.max(MIN_COLUMN_WIDTH, columnDrag.startRight - cappedDx)}px`;
+    }
+
+    function endColumnDrag() {
+      if (!columnDrag) return;
+      columnDrag.th.classList.remove("is-resizing");
+      document.body.classList.remove("resizing-column");
+      if (elements.markdownRendered.hasPointerCapture(columnDrag.pointerId)) {
+        elements.markdownRendered.releasePointerCapture(columnDrag.pointerId);
+      }
+      columnDrag = null;
+    }
+
+    function resetColumnWidth(event) {
+      const target = findColumnResizeTarget(event, false);
+      if (!target) return;
+      const col = target.table.querySelector(`col[data-col-index="${target.colIndex}"]`);
+      if (col) col.style.width = "";
+      // If no column keeps a manual width, drop the marker and recompute the
+      // wrap classes (wide-table/no-fit/compact may be stale from before drag).
+      if (!target.table.querySelector('col[style*="width"]')) {
+        target.table.classList.remove("manual-col-widths");
+        updateMarkdownLayout();
+      }
+    }
+
+    function clearManualTableWidths(table) {
+      table.querySelectorAll("col").forEach((col) => { col.style.width = ""; });
+      table.classList.remove("manual-col-widths");
+    }
+
+    function clearAllManualTableWidths() {
+      elements.markdownRendered?.querySelectorAll("table.manual-col-widths").forEach(clearManualTableWidths);
+    }
+
+    function bindTableColumnResize() {
+      elements.markdownRendered.addEventListener("pointerdown", (event) => {
+        const target = findColumnResizeTarget(event);
+        if (target) startColumnDrag(event, target);
+      });
+      elements.markdownRendered.addEventListener("pointermove", moveColumnDrag);
+      elements.markdownRendered.addEventListener("pointerup", endColumnDrag);
+      elements.markdownRendered.addEventListener("pointercancel", endColumnDrag);
+      elements.markdownRendered.addEventListener("lostpointercapture", endColumnDrag);
+      elements.markdownRendered.addEventListener("dblclick", resetColumnWidth);
+      // Header cells may contain links; prevent HTML5 drag ghosts on them.
+      elements.markdownRendered.addEventListener("dragstart", (event) => {
+        if (event.target.closest?.("thead th")) event.preventDefault();
+      });
+    }
+
+    // Which section is being read, tracked from the scroll position rather than
+    // from the last click, so a heading reached by scrolling, by search, or by
+    // the outline all agree.
+    //
+    // This drives the outline only. Headings are deliberately NOT sticky (see
+    // markdown.css): several headings pinned at the same offset stack on top of
+    // one another, and the outline already answers "where am I" without also
+    // restyling the heading in the reading column.
     function updateMarkdownStickyHeading() {
       if (!elements.markdownRendered || elements.markdownRendered.classList.contains("hidden") || !elements.markdownContent) return;
       const headings = [...elements.markdownRendered.querySelectorAll("h2, h3, h4, h5, h6")];
-      if (!headings.length) {
-        elements.markdownContent.style.setProperty("--markdown-sticky-offset", "0px");
-        elements.markdownRendered.style.setProperty("--markdown-sticky-offset", "0px");
-        return;
-      }
       const scrollRoot = state.markdownEditMode ? elements.markdownRendered : elements.markdownContent;
       const contentTop = scrollRoot.getBoundingClientRect().top;
-      let active = null;
+      syncMarkdownTocActive(currentMarkdownHeading(headings, contentTop), scrollRoot);
+    }
+
+    // The heading being read is the last one whose *bottom* has passed the top
+    // edge, not the last whose top has: a heading is already "current" while it
+    // is still partly visible under the toolbar.
+    function currentMarkdownHeading(headings, contentTop) {
+      let current = null;
       for (const heading of headings) {
-        const top = heading.getBoundingClientRect().top;
-        if (top <= contentTop + 4) active = heading;
+        if (heading.getBoundingClientRect().bottom <= contentTop + 4) current = heading;
         else break;
       }
-      for (const heading of headings) heading.classList.toggle("markdown-active-heading", heading === active);
-      const stickyOffset = active ? Math.max(0, Math.ceil(active.getBoundingClientRect().height)) : 0;
-      elements.markdownContent.style.setProperty("--markdown-sticky-offset", `${stickyOffset}px`);
-      elements.markdownRendered.style.setProperty("--markdown-sticky-offset", `${stickyOffset}px`);
+      return current || headings[0] || null;
+    }
+
+    // Keep the outline's own scroll position pinned to the section being read.
+    function syncMarkdownTocActive(active, scrollRoot) {
+      const links = [...elements.markdownTocList.querySelectorAll("a")];
+      if (!links.length) return;
+      const activeId = active?.id || (state.markdownTocItems?.[0] ?? "");
+      let currentLink = null;
+      for (const link of links) {
+        const isCurrent = link.dataset.target === activeId;
+        link.classList.toggle("active", isCurrent);
+        link.setAttribute("aria-current", isCurrent ? "true" : "false");
+        if (isCurrent) currentLink = link;
+      }
+      if (elements.markdownTocCurrent) {
+        elements.markdownTocCurrent.textContent = currentLink ? currentLink.textContent : "";
+      }
+      // Keep the active row inside the outline's own viewport without moving
+      // the document: `nearest` is a no-op when it is already visible.
+      currentLink?.scrollIntoView({ block: "nearest" });
+      const scrollable = scrollRoot.scrollHeight - scrollRoot.clientHeight;
+      const ratio = scrollable > 0 ? Math.min(1, Math.max(0, scrollRoot.scrollTop / scrollable)) : 0;
+      if (elements.markdownTocProgress) {
+        const height = elements.markdownToc?.clientHeight || 0;
+        elements.markdownTocProgress.style.height = `${Math.round(ratio * height)}px`;
+      }
     }
 
     async function toggleMarkdownFullscreen() {
@@ -468,6 +683,8 @@
       elements.markdownFullscreen.textContent = active ? "退出全屏" : "全屏查看";
       elements.markdownFullscreen.setAttribute("aria-pressed", String(active));
     }
+
+    bindTableColumnResize();
 
     document.addEventListener("fullscreenchange", updateMarkdownFullscreenButton);
     document.addEventListener("keydown", (event) => {

@@ -1,31 +1,59 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="color-scheme" content="light" />
     <title>fxxk_file · 多功能文档工作台</title>
-    <link rel="stylesheet" href="/styles.css?v=20260827-frontend-fix" />
+    <script>
+      // Applied before first paint so the shell never flashes the wrong theme
+      // or an expanded sidebar. Mirrors DISPLAY_PREFERENCES_KEY in app.js.
+      (function () {
+        try {
+          var prefs = JSON.parse(localStorage.getItem("fxxk_file-display-preferences-v1") || "{}");
+          document.documentElement.dataset.theme = prefs.theme === "dark" ? "dark" : "light";
+          if (prefs.sidebarCollapsed) document.documentElement.classList.add("boot-sidebar-collapsed");
+        } catch (e) {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="/styles.css?v=20260916-sticky3" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <div class="brand">
-          <div class="brand-mark">译</div>
-          <div>
-            <strong>fxxk_file Workbench</strong>
-            <span>多功能文档工作台</span>
-          </div>
-        </div>
+        <button id="sidebarToggle" class="icon-button topbar-toggle" type="button"
+                aria-label="折叠侧栏" aria-expanded="true" title="折叠/展开侧栏（Ctrl+B）">☰</button>
+
+        <!-- Page switcher: the second navigation level. Sidebar picks the
+             function, this strip picks the view inside it. -->
+        <nav id="pageTabs" class="page-tabs" role="tablist" aria-label="页面切换"></nav>
+
         <div class="top-actions">
-          <div class="function-menu" id="functionMenu"><span class="function-icon">✦</span><span class="function-label">功能</span><button id="functionTrigger" class="function-trigger" type="button">文档翻译 <span>⌄</span></button><div id="functionOptions" class="function-options"><button type="button" data-value="translate">文档翻译</button><button type="button" data-value="compare">双文件对比</button><button type="button" data-value="images">图片转换</button><button type="button" data-value="markdown">Markdown 查看</button></div><select id="functionSelect" hidden><option value="translate">文档翻译</option><option value="compare">双文件对比</option><option value="images">图片转换</option><option value="markdown">Markdown 查看</option></select></div>
+          <div id="documentSearch" class="document-search" role="search" aria-label="文档字段搜索">
+            <span class="document-search-icon" aria-hidden="true">⌕</span>
+            <input id="documentSearchInput" type="search" autocomplete="off" spellcheck="false" placeholder="搜索字段…" aria-label="搜索当前文档字段" />
+            <span id="documentSearchCount" class="document-search-count" aria-live="polite">0/0</span>
+            <button id="documentSearchPrev" class="document-search-nav" type="button" title="上一个匹配（Shift+Enter）" aria-label="上一个匹配">↑</button>
+            <button id="documentSearchNext" class="document-search-nav" type="button" title="下一个匹配（Enter）" aria-label="下一个匹配">↓</button>
+          </div>
           <span id="saveState" class="save-state">已保存</span>
+          <button id="themeToggle" class="button subtle" type="button" aria-label="切换主题" title="切换深色/浅色主题">☾</button>
+          <button id="shortcutButton" class="icon-button" type="button" title="快捷键（?）" aria-label="查看快捷键">⌘</button>
           <button id="settingsButton" class="button subtle" type="button"><span class="dot" id="configDot"></span>模型设置</button>
         </div>
+        <!-- Kept hidden: every existing code path still reads/writes the
+             selected function through this element. -->
+        <select id="functionSelect" hidden><option value="translate">文档翻译</option><option value="compare">双文件对比</option><option value="convert">文件转换</option><option value="images">图片转换</option><option value="markdown">Markdown 查看</option></select>
       </header>
 
       <div class="body-layout">
         <aside class="sidebar">
+          <!-- Level one: which workspace am I in. -->
+          <nav id="functionNav" class="function-nav" aria-label="功能切换"></nav>
+
+          <!-- Level two: the controls that belong to that workspace. -->
+          <div class="sidebar-context">
           <div class="sidebar-panel" data-sidebar="translate">
             <label id="dropzone" class="dropzone" for="fileInput">
               <input id="fileInput" type="file" accept=".doc,.docx,.pdf" multiple hidden />
@@ -33,7 +61,18 @@
               <strong>拖入待翻译文档</strong>
               <span>DOC · DOCX · PDF</span>
             </label>
-            <label class="auto-translate"><input id="autoTranslate" type="checkbox" checked /> 上传后立即翻译</label>
+            <div class="upload-options">
+              <label class="option-row"><input id="autoTranslate" type="checkbox" checked /> 上传后立即翻译</label>
+              <label class="option-row" id="autoOcrLabel"><input id="autoOcr" type="checkbox" /> 扫描件自动 OCR（离线）</label>
+              <label class="option-row" id="zhScriptLabel"><span>译文中文</span>
+                <select id="zhScriptMode" aria-label="译文中文用字">
+                  <option value="auto">跟随目标语言（简体）</option>
+                  <option value="simplified">简体中文</option>
+                  <option value="traditional">繁體中文</option>
+                  <option value="off">不做转换</option>
+                </select>
+              </label>
+            </div>
 
             <div class="sidebar-heading">
               <span>最近文档</span>
@@ -87,6 +126,30 @@
               <li>点击右上角全屏按钮，获得沉浸式阅读体验。</li>
             </ul>
           </div>
+
+          <div class="sidebar-panel" data-sidebar="convert">
+            <div class="sidebar-note intro">
+              <strong>文件转换</strong>
+              <p>字幕、表格、文档、PDF 页面与中文字形的批量转换，全部在本机完成。</p>
+            </div>
+            <div class="sidebar-heading"><span>转换类型</span></div>
+            <div id="convertGroups" class="convert-groups" role="group" aria-label="转换类型"></div>
+            <div class="sidebar-note">
+              <strong>本地处理</strong>
+              <p>所有转换只在本机服务上完成，文件不会上传到第三方。需要额外依赖的工具会自动置灰并说明安装命令。</p>
+            </div>
+          </div>
+          </div>
+
+          <!-- Global controls: identical in every workspace. -->
+          <div class="sidebar-footer">
+            <button id="themeToggleSidebar" class="sidebar-action" type="button" title="切换深色/浅色主题" aria-label="切换深色/浅色主题">
+              <span class="sidebar-action-icon">☾</span><span class="sidebar-action-text">深色模式</span>
+            </button>
+            <button id="settingsButtonSidebar" class="sidebar-action" type="button" title="翻译模型设置" aria-label="翻译模型设置">
+              <span class="sidebar-action-icon">⚙</span><span class="sidebar-action-text">模型设置</span>
+            </button>
+          </div>
         </aside>
 
         <main id="main" class="main-panel">
@@ -108,27 +171,39 @@
                 </div>
               </div>
               <div class="toolbar-actions">
-                <select id="sourceLanguage" aria-label="源语言">
-                  <option value="zh">中文</option>
-                  <option value="en">English</option>
-                </select>
-                <span class="direction-arrow">→</span>
-                <select id="targetLanguage" aria-label="目标语言">
-                  <option value="en">English</option>
-                  <option value="zh">中文</option>
-                </select>
-                <button id="translateButton" class="button primary" type="button">翻译空白段落</button>
-                <button id="retranslateButton" class="button" type="button" title="重新翻译全部机器译文与空白段落，保留已编辑、已审校和锁定的段落">重译全文</button>
-                <button id="fileViewButton" class="button view-button active" type="button" title="左侧查看原始版面，右侧逐段审校">原件版面对照</button>
-                <button id="alignedViewButton" class="button view-button" type="button" title="原文与译文严格逐段并排">逐段精确对照</button>
-                <a id="openOriginalButton" class="button" target="_blank">打开原文件</a>
-                <button id="downloadTranslationButton" class="button" type="button">下载译文 DOCX</button>
+                <div class="toolbar-group">
+                  <select id="sourceLanguage" aria-label="源语言">
+                    <option value="zh">中文</option>
+                    <option value="en">English</option>
+                  </select>
+                  <span class="direction-arrow" aria-hidden="true">→</span>
+                  <select id="targetLanguage" aria-label="目标语言">
+                    <option value="en">English</option>
+                    <option value="zh">中文</option>
+                  </select>
+                </div>
+                <div class="toolbar-group">
+                  <button id="translateButton" class="button primary" type="button">翻译空白段落</button>
+                  <button id="retranslateButton" class="button" type="button" title="重新翻译全部机器译文与空白段落，保留已编辑、已审校和锁定的段落">重译全文</button>
+                  <button id="zhScriptButton" class="button" type="button" title="把全部中文译文按「译文中文」设置转换为简体或繁体，本地完成，不消耗额度">繁简转换</button>
+                </div>
+                <div class="toolbar-group">
+                  <span class="view-switch" role="group" aria-label="对照视图">
+                    <button id="fileViewButton" class="button view-button active" type="button" title="左侧查看原始版面，右侧逐段审校">原件版面对照</button>
+                    <button id="alignedViewButton" class="button view-button" type="button" title="原文与译文严格逐段并排">逐段精确对照</button>
+                  </span>
+                </div>
+                <div class="toolbar-group">
+                  <button id="openOriginalButton" class="button" target="_blank" rel="noopener">打开原文件</button>
+                  <button id="downloadTranslationButton" class="button primary" type="button">下载译文 DOCX</button>
+                </div>
               </div>
             </div>
 
-            <div id="progressWrap" class="progress-wrap hidden">
+            <div id="progressWrap" class="progress-wrap hidden" role="status" aria-live="polite">
               <div class="progress-track"><span id="progressBar"></span></div>
               <span id="progressText">翻译中 0%</span>
+              <button id="stopButton" class="button danger" type="button" title="停止当前翻译任务；已完成的译文会保留">停止翻译</button>
             </div>
 
             <div id="reviewBody" class="review-body file-view">
@@ -162,6 +237,21 @@
                     </span>
                   </span>
                 </div>
+                <div class="review-filter" role="group" aria-label="段落筛选与批量操作">
+                  <span class="review-filter-label">筛选</span>
+                  <div id="segmentFilter" class="review-filter-chips"></div>
+                  <span id="segmentFilterCount" class="review-filter-count" aria-live="polite"></span>
+                  <div class="review-bulk" id="reviewBulk">
+                    <button id="bulkMenu" class="button" type="button" aria-haspopup="true" aria-expanded="false">批量操作</button>
+                    <div id="bulkOptions" class="review-bulk-options hidden" role="menu" aria-label="批量操作">
+                      <button id="bulkLock" type="button" role="menuitem">锁定所选段落</button>
+                      <button id="bulkUnlock" type="button" role="menuitem">解锁所选段落</button>
+                      <button id="bulkReview" type="button" role="menuitem">标记为已审校</button>
+                      <button id="bulkUnreview" type="button" role="menuitem">撤销审校状态</button>
+                      <button id="bulkClear" class="danger" type="button" role="menuitem">清空所选译文</button>
+                    </div>
+                  </div>
+                </div>
                 <div class="column-headings">
                   <span>#</span>
                   <strong id="sourceHeading">原文</strong>
@@ -169,6 +259,10 @@
                   <span></span>
                 </div>
                 <div id="segmentRows" class="segment-rows"></div>
+                <div id="segmentRowsEmpty" class="segment-rows-empty hidden">
+                  <p id="segmentRowsEmptyText">当前筛选下没有段落。</p>
+                  <button id="segmentRowsEmptyReset" class="button" type="button">显示全部段落</button>
+                </div>
               </section>
             </div>
           </section>
@@ -176,33 +270,48 @@
       </div>
     </div>
 
+    <dialog id="shortcutDialog" class="shortcut-dialog">
+      <div class="dialog-heading">
+        <div>
+          <h2>快捷键</h2>
+          <p>在当前工作区内使用；输入框获得焦点时只保留与编辑相关的组合键。</p>
+        </div>
+        <button id="closeShortcuts" class="icon-button" type="button" aria-label="关闭快捷键面板">×</button>
+      </div>
+      <div class="dialog-body">
+        <div id="shortcutList" class="shortcut-list"></div>
+      </div>
+    </dialog>
+
     <dialog id="settingsDialog" class="settings-dialog">
-      <form id="settingsForm" method="dialog">
+      <form id="settingsForm" method="dialog" class="dialog-form">
         <div class="dialog-heading">
           <div>
             <h2>翻译模型设置</h2>
             <p>支持 CCSwitch、本地网关、OpenAI 兼容接口和 Anthropic 兼容接口。配置仅保存在本机 <code>.env</code>。</p>
           </div>
-          <button id="closeSettings" class="icon-button" type="button">×</button>
+          <button id="closeSettings" class="icon-button" type="button" aria-label="关闭设置">×</button>
         </div>
-        <label>接口协议
-          <select id="apiProtocol" name="apiProtocol">
-            <option value="openai">OpenAI 兼容 / CCSwitch 网关</option>
-            <option value="anthropic">Anthropic Messages 兼容网关</option>
-          </select>
-        </label>
-        <label>网关地址或完整请求地址<input id="baseUrl" name="baseUrl" type="url" required placeholder="http://127.0.0.1:端口/v1" /></label>
-        <label>模型名称<input id="modelName" name="modelName" type="text" required placeholder="deepseek-chat" /></label>
-        <div class="model-hint">可支持模型：<code>deepseek-chat</code>（通用对话）、<code>deepseek-reasoner</code>（深度推理），也兼容其它 OpenAI / Anthropic 网关的模型 ID。使用外网模型（如 DeepSeek 官方 API）时请检查网络环境，必要时调整下方「使用系统代理」。</div>
-        <div class="setting-grid">
-          <label>每次最多段落数<input id="batchSize" type="number" min="1" max="10" step="1" required /></label>
-          <label>单次最大原文字符数<input id="requestCharLimit" type="number" min="500" max="20000" step="500" required /></label>
-          <label>失败自动重试次数<input id="maxRetries" type="number" min="0" max="10" step="1" required /></label>
+        <div class="dialog-body">
+          <label>接口协议
+            <select id="apiProtocol" name="apiProtocol">
+              <option value="openai">OpenAI 兼容 / CCSwitch 网关</option>
+              <option value="anthropic">Anthropic Messages 兼容网关</option>
+            </select>
+          </label>
+          <label>网关地址或完整请求地址<input id="baseUrl" name="baseUrl" type="url" required placeholder="http://127.0.0.1:端口/v1" /></label>
+          <label>模型名称<input id="modelName" name="modelName" type="text" required placeholder="deepseek-chat" /></label>
+          <div class="model-hint">可支持模型：<code>deepseek-chat</code>（通用对话）、<code>deepseek-reasoner</code>（深度推理），也兼容其它 OpenAI / Anthropic 网关的模型 ID。使用外网模型（如 DeepSeek 官方 API）时请检查网络环境，必要时调整下方「使用系统代理」。</div>
+          <div class="setting-grid">
+            <label>每次最多段落数<input id="batchSize" type="number" min="1" max="10" step="1" required /></label>
+            <label>单次最大原文字符数<input id="requestCharLimit" type="number" min="500" max="20000" step="500" required /></label>
+            <label>失败自动重试次数<input id="maxRetries" type="number" min="0" max="10" step="1" required /></label>
+          </div>
+          <label>API Key（本地无鉴权网关可留空）<input id="apiKey" name="apiKey" type="password" autocomplete="off" placeholder="已配置时留空可保留原 Key" /></label>
+          <div id="keyHint" class="key-hint"></div>
+          <label class="clear-key"><input id="clearApiKey" type="checkbox" /> 清除已经保存的 API Key</label>
+          <label class="clear-key"><input id="useSystemProxy" type="checkbox" /> 使用 Windows/环境变量中的系统代理</label>
         </div>
-        <label>API Key（本地无鉴权网关可留空）<input id="apiKey" name="apiKey" type="password" autocomplete="off" placeholder="已配置时留空可保留原 Key" /></label>
-        <div id="keyHint" class="key-hint"></div>
-        <label class="clear-key"><input id="clearApiKey" type="checkbox" /> 清除已经保存的 API Key</label>
-        <label class="clear-key"><input id="useSystemProxy" type="checkbox" /> 使用 Windows/环境变量中的系统代理</label>
         <div class="dialog-actions">
           <button id="cancelSettings" class="button" type="button">取消</button>
           <button class="button primary" type="submit">保存设置</button>
@@ -211,15 +320,27 @@
     </dialog>
 
     <dialog id="compareDialog" class="compare-dialog">
-      <form method="dialog" class="compare-form">
-        <div class="dialog-heading"><div><h2>打开两份文件进行比对</h2><p>支持 Word、PDF 和照片；文档按页数同步，照片共享缩放。</p></div><button id="closeCompare" class="icon-button" type="button">×</button></div>
-        <div class="compare-pickers"><label class="compare-file-picker">选择文件<input id="compareFilesInput" type="file" accept=".doc,.docx,.pdf,image/*" multiple required /><span>一次选择两份文件；超过两份时只使用前两份</span></label></div><div id="compareUploadProgress" class="compare-upload-progress hidden"><div class="compare-progress-head"><span id="compareUploadStatus">正在准备文件…</span><b id="compareUploadPercent">0%</b></div><div class="compare-progress-track"><i id="compareUploadBar"></i></div></div><p class="compare-hint">请使用同一类型：文档 + 文档，或图片 + 图片。</p>
+      <form method="dialog" class="compare-form dialog-form">
+        <div class="dialog-heading"><div><h2>打开两份文件进行比对</h2><p>支持 Word、PDF 和照片；文档按页数同步，照片共享缩放。</p></div><button id="closeCompare" class="icon-button" type="button" aria-label="关闭对比窗口">×</button></div>
+        <div class="dialog-body">
+          <div class="compare-pickers"><label class="compare-file-picker">选择文件<input id="compareFilesInput" type="file" accept=".doc,.docx,.pdf,image/*" multiple required /><span>一次选择两份文件；超过两份时只使用前两份</span></label></div>
+          <div id="compareUploadProgress" class="compare-upload-progress hidden"><div class="compare-progress-head"><span id="compareUploadStatus">正在准备文件…</span><b id="compareUploadPercent">0%</b></div><div class="compare-progress-track"><i id="compareUploadBar"></i></div></div>
+          <p class="compare-hint">请使用同一类型：文档 + 文档，或图片 + 图片。</p>
+        </div>
         <div class="dialog-actions"><button id="cancelCompare" class="button" type="button">取消</button><button id="startCompare" class="button primary" type="submit">开始对比</button></div>
       </form>
     </dialog>
     <section id="compareWorkspace" class="compare-workspace hidden">
-      <div class="compare-toolbar"><strong>双文件对比</strong><span id="compareStatus">请选择两份文件</span><span class="compare-toolbar-actions"><label><input id="compareSync" type="checkbox" checked /> 同步滚动</label><span class="preview-zoom"><button id="compareZoomOut" type="button">−</button><button id="compareZoomReset" type="button"><b id="compareZoomValue">100%</b></button><button id="compareZoomIn" type="button">＋</button></span><button id="closeCompareWorkspace" class="button" type="button">返回翻译工作区</button></span></div>
+      <div class="compare-toolbar"><strong>双文件对比</strong><span id="compareStatus">请选择两份文件</span><span class="compare-toolbar-actions"><label id="compareDiffLabel"><input id="compareDiff" type="checkbox" /> 高亮差异</label><label><input id="compareSync" type="checkbox" checked /> 同步滚动</label><span class="preview-zoom"><button id="compareZoomOut" type="button">−</button><button id="compareZoomReset" type="button"><b id="compareZoomValue">100%</b></button><button id="compareZoomIn" type="button">＋</button></span><button id="closeCompareWorkspace" class="button" type="button">返回翻译工作区</button></span></div>
       <div class="compare-panels"><div class="compare-panel"><div id="compareLeftTitle" class="compare-panel-title"></div><div id="compareLeft" class="compare-canvas"></div></div><div class="compare-divider"></div><div class="compare-panel"><div id="compareRightTitle" class="compare-panel-title"></div><div id="compareRight" class="compare-canvas"></div></div></div>
+      <section id="compareDiffPanel" class="compare-diff-panel hidden" aria-label="两份文档的文本差异">
+        <div class="compare-diff-head">
+          <strong>文本差异</strong>
+          <span id="compareDiffSummary" class="compare-diff-summary" aria-live="polite"></span>
+          <button id="compareDiffClose" class="icon-button" type="button" title="收起差异面板">×</button>
+        </div>
+        <div id="compareDiffBody" class="compare-diff-body"></div>
+      </section>
     </section>
 
     <section id="imagesWorkspace" class="images-workspace hidden">
@@ -245,6 +366,8 @@
           <div><strong>Markdown 查看器</strong><span id="markdownFileMeta">选择一个文件开始阅读</span></div>
         </div>
         <div class="markdown-toolbar-actions">
+          <button id="markdownTocToggle" class="button" type="button" aria-pressed="true"
+                  title="显示或隐藏左侧目录（Ctrl+\\）">隐藏目录</button>
           <label class="markdown-open-button button primary" for="markdownFileInput">打开 Markdown<input id="markdownFileInput" type="file" accept=".md,.markdown,.mdown,.mkdn,.txt,text/markdown,text/plain" hidden /></label>
           <button id="markdownEditToggle" class="button" type="button" aria-pressed="false">编辑 Markdown</button>
           <button id="markdownDownload" class="button" type="button" title="下载当前 Markdown 内容">下载 .md</button>
@@ -259,9 +382,13 @@
       </div>
       <div class="markdown-body-wrap">
         <aside id="markdownToc" class="markdown-toc" aria-label="文档目录">
-          <div class="markdown-toc-heading">目录</div>
+          <div class="markdown-toc-heading"><span>目录</span><span id="markdownTocCurrent" class="markdown-toc-current"></span></div>
           <div id="markdownTocList" class="markdown-toc-list"><span class="markdown-toc-empty">打开文件后显示目录</span></div>
+          <div id="markdownTocProgress" class="markdown-toc-progress" aria-hidden="true"></div>
         </aside>
+        <div id="markdownTocSplitter" class="markdown-toc-splitter" role="separator" tabindex="0"
+             aria-label="调整目录宽度" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="420" aria-valuenow="196"
+             title="拖动调整目录宽度，双击收起或展开"></div>
         <main id="markdownContent" class="markdown-content">
           <div id="markdownEmpty" class="markdown-empty-state">
             <div class="markdown-empty-icon">#</div>
@@ -277,14 +404,182 @@
       <div id="markdownStatus" class="markdown-status" aria-live="polite">等待打开文件</div>
     </section>
 
+    <section id="convertWorkspace" class="convert-workspace hidden" aria-label="文件转换">
+      <div class="convert-toolbar">
+        <div class="convert-toolbar-title">
+          <span class="convert-mark">⇄</span>
+          <div><strong>文件转换</strong><span>字幕、表格、文档、PDF 与中文字形，全部在本机完成</span></div>
+        </div>
+        <span class="convert-toolbar-actions">
+          <button id="closeConvertWorkspace" class="button" type="button">返回文档翻译</button>
+        </span>
+      </div>
+
+      <div class="convert-body">
+        <div id="convertPanels" class="convert-panels">
+          <!-- 中文排版 -->
+          <section class="convert-panel" data-panel="text">
+            <h2>中文排版</h2>
+            <p class="convert-hint">修复遗留编码、全角半角与中英标点。上传文件时会自动检测编码并显示结果。</p>
+            <label>转换方式
+              <select id="convertTextMode"></select>
+            </label>
+            <label>上传文本文件（可选，留空则使用下面的文本）
+              <input id="convertTextFile" type="file" accept=".txt,.csv,.tsv,.md,.srt,.json,.xml,.html,text/*" />
+            </label>
+            <label class="convert-grow">文本内容
+              <textarea id="convertTextInput" rows="8" placeholder="粘贴要转换的文本…"></textarea>
+            </label>
+          </section>
+
+          <!-- 表格互转 -->
+          <section class="convert-panel" data-panel="tables">
+            <h2>表格互转</h2>
+            <p class="convert-hint">CSV、TSV、JSON、Markdown 表格与 HTML 表格之间互转，来源格式可自动识别。</p>
+            <div class="convert-row">
+              <label>来源格式
+                <select id="convertTableSource"></select>
+              </label>
+              <label>输出格式
+                <select id="convertTableTarget"></select>
+              </label>
+            </div>
+            <label class="convert-grow">表格内容
+              <textarea id="convertTableInput" rows="10" placeholder="name,qty&#10;螺栓,12"></textarea>
+            </label>
+          </section>
+
+          <!-- 字幕互转 -->
+          <section class="convert-panel" data-panel="subtitles">
+            <h2>字幕互转</h2>
+            <p class="convert-hint">格式互转、双语合并（按时间轴对齐）与双语拆分。</p>
+            <label>操作
+              <select id="convertSubtitleMode">
+                <option value="convert">格式互转</option>
+                <option value="merge">双语合并（两条字幕 → 一条）</option>
+                <option value="split">双语拆分（一条字幕 → 两条）</option>
+              </select>
+            </label>
+            <label id="convertSubtitleTargetField">输出格式
+              <select id="convertSubtitleTarget"></select>
+            </label>
+            <label id="convertSubtitleSingle">字幕文件
+              <input id="convertSubtitleSingle" type="file" accept=".srt,.vtt,.ass,.ssa,.sub,.lrc,text/plain" />
+            </label>
+            <label id="convertSubtitlePair" class="hidden">两份字幕文件（第一份为原语言）
+              <input id="convertSubtitlePair" type="file" accept=".srt,.vtt,.ass,.ssa,.sub,.lrc,text/plain" multiple />
+            </label>
+          </section>
+
+          <!-- 文档互转 -->
+          <section class="convert-panel" data-panel="documents">
+            <h2>文档互转</h2>
+            <p class="convert-hint">HTML → Markdown、DOCX → Markdown、Markdown → DOCX。</p>
+            <label>操作
+              <select id="convertDocumentMode">
+                <option value="html_to_markdown">HTML → Markdown</option>
+                <option value="docx_to_markdown">DOCX → Markdown</option>
+                <option value="markdown_to_docx">Markdown → DOCX</option>
+              </select>
+            </label>
+            <label id="convertDocumentFileField">上传文件（HTML 或 DOCX）
+              <input id="convertDocumentFile" type="file" accept=".html,.htm,.docx" />
+            </label>
+            <label class="convert-grow">文本内容（HTML 源码或 Markdown）
+              <textarea id="convertDocumentInput" rows="10" placeholder="粘贴 HTML 源码或 Markdown…"></textarea>
+            </label>
+          </section>
+
+          <!-- PDF 页面 -->
+          <section class="convert-panel" data-panel="pdf">
+            <h2>PDF 页面</h2>
+            <p class="convert-hint">合并、按页拆分、提取、删除、旋转与文字水印。水印支持拉丁字符。</p>
+            <label>操作
+              <select id="convertPdfMode"></select>
+            </label>
+            <label>PDF 文件（合并时可选多份）
+              <input id="convertPdfFiles" type="file" accept=".pdf,application/pdf" multiple />
+            </label>
+            <div class="convert-row">
+              <label id="convertPdfPagesField">页码范围（如 1-3,7；留空为全部）
+                <input id="convertPdfPages" type="text" placeholder="1-3,7" />
+              </label>
+              <label id="convertPdfDegreesField" class="hidden">旋转角度
+                <select id="convertPdfDegrees">
+                  <option value="90">顺时针 90°</option>
+                  <option value="180">180°</option>
+                  <option value="270">逆时针 90°</option>
+                </select>
+              </label>
+            </div>
+            <label id="convertPdfTextField" class="hidden">水印文字
+              <input id="convertPdfText" type="text" placeholder="DRAFT" />
+            </label>
+          </section>
+
+          <!-- 数字与拼音 -->
+          <section class="convert-panel" data-panel="language">
+            <h2>数字与拼音</h2>
+            <p class="convert-hint">金额中文大写、整数转中文数字、汉字拼音标注。</p>
+            <div class="convert-row">
+              <label>转换方式
+                <select id="convertLanguageMode">
+                  <option value="upper_amount">金额 → 中文大写</option>
+                  <option value="chinese_number">整数 → 中文数字</option>
+                  <option value="pinyin">汉字 → 拼音</option>
+                </select>
+              </label>
+              <label>拼音风格
+                <select id="convertLanguageStyle">
+                  <option value="plain">不带声调（ni hao）</option>
+                  <option value="tone">带声调（nǐ hǎo）</option>
+                  <option value="tone3">数字声调（ni3 hao3）</option>
+                  <option value="first">仅首字母（n h）</option>
+                </select>
+              </label>
+            </div>
+            <label>输入
+              <input id="convertLanguageInput" type="text" placeholder="1234.56 / 10005 / 你好世界" />
+            </label>
+          </section>
+        </div>
+
+        <aside class="convert-side">
+          <div class="convert-action">
+            <button id="convertRun" class="button primary" type="button">开始转换</button>
+            <p class="convert-action-hint">选择左侧转换类型并填好参数；结果会出现在下方，可直接复制或另存。</p>
+            <span id="convertStatus" class="convert-status" aria-live="polite"></span>
+          </div>
+          <div id="convertResult" class="convert-result hidden">
+            <div class="convert-result-head">
+              <strong id="convertTitle">转换完成</strong>
+              <span id="convertStats" class="convert-stats"></span>
+            </div>
+            <textarea id="convertResultText" rows="12" readonly aria-label="转换结果"></textarea>
+            <div id="convertFiles" class="convert-files"></div>
+            <div class="convert-result-actions">
+              <button id="convertCopy" class="button" type="button">复制</button>
+              <button id="convertSave" class="button" type="button">另存为 .txt</button>
+              <button id="convertClear" class="button subtle" type="button">清空结果</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
     <div id="uploadOverlay" class="upload-overlay hidden">
-      <div><span>＋</span><strong>松开即可导入并翻译</strong></div>
+      <div><span>＋</span><strong>松开即可导入并翻译</strong><p>支持 DOC · DOCX · PDF，可一次拖入多个文件</p></div>
     </div>
     <div id="toast" class="toast hidden"></div>
     <script src="/vendor/pdf.min.js"></script>
-    <script src="/scripts/features/compare.js?v=20260827-frontend-fix" defer></script>
-    <script src="/scripts/features/images.js?v=20260827-frontend-fix" defer></script>
-    <script src="/scripts/features/markdown.js?v=20260827-table-fix" defer></script>
-    <script src="/app.js?v=20260827-frontend-fix" defer></script>
+    <script src="/vendor/purify.min.js"></script>
+    <script src="/vendor/diff.min.js"></script>
+    <script src="/vendor/markdown-it.min.js"></script>
+    <script src="/vendor/markdown-it-task-lists.min.js"></script>
+    <script src="/scripts/features/compare.js?v=20260916-sticky3" defer></script>
+    <script src="/scripts/features/images.js?v=20260916-sticky3" defer></script>
+    <script src="/scripts/features/convert.js?v=20260916-sticky3" defer></script>
+    <script src="/scripts/features/markdown.js?v=20260916-sticky3" defer></script>
+    <script src="/app.js?v=20260916-sticky3" defer></script>
   </body>
 </html>

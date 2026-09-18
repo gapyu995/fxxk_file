@@ -11,6 +11,11 @@ class TranslationRequest(BaseModel):
     source_language: Literal["zh", "en"]
     target_language: Literal["zh", "en"]
     overwrite: bool = False
+    zh_script_mode: Literal["auto", "simplified", "traditional", "off"] | None = None
+
+
+class ConvertScriptRequest(BaseModel):
+    mode: Literal["auto", "simplified", "traditional", "off"] = "auto"
 
 
 class SegmentUpdate(BaseModel):
@@ -29,8 +34,16 @@ class SettingsUpdate(BaseModel):
     batch_size: int = Field(default=3, ge=1, le=10)
     request_char_limit: int = Field(default=6000, ge=500, le=20000)
     max_retries: int = Field(default=5, ge=0, le=10)
+    zh_script_mode: Literal["auto", "simplified", "traditional", "off"] = "auto"
     clear_key: bool = False
 
 
 class AutosaveRequest(BaseModel):
     translations: dict[str, str] = Field(default_factory=dict)
+
+
+class SegmentBatchRequest(BaseModel):
+    """Filter plus action for one bulk paragraph operation."""
+
+    filter: Literal["all", "empty", "machine", "edited", "reviewed", "locked", "untranslated"] = "all"
+    action: Literal["lock", "unlock", "review", "unreview", "clear"]

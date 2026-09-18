@@ -6,3 +6,10 @@ pypdf==5.4.0
 httpx==0.28.1
 python-dotenv==1.1.0
 pywebview==5.4
+# Layout-aware PDF text extraction (MIT, jsvine/pdfplumber). The extractor keeps
+# working without it and falls back to pypdf.
+pdfplumber==0.11.10
+# Rule-based sentence boundary detection (MIT, nipunsadvilkar/pySBD).
+pysbd==0.3.4
+# Traditional/Simplified Chinese conversion (Apache-2.0, yichen0831/opencc-python).
+zhconv==1.4.3

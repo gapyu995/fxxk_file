@@ -11,7 +11,9 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 
 from app.api.dependencies import load_or_404
+from app.config import get_settings
 from app.core.runtime import MAX_UPLOAD_BYTES, active_tasks
+from app.services import pdf_layout
 from app.services.extractor import ExtractionError, SUPPORTED_EXTENSIONS, extract_paragraphs
 from app.services.segmenter import detect_language, split_into_segments
 from app.services.storage import (
@@ -40,6 +42,7 @@ async def upload_document(
     file: UploadFile = File(...),
     source_language: str = Form("auto"),
     target_language: str = Form("auto"),
+    auto_ocr: bool = Form(False),
 ) -> dict:
     original_name = safe_filename(file.filename or "document")
     suffix = Path(original_name).suffix.lower()
@@ -57,7 +60,12 @@ async def upload_document(
                 if size > MAX_UPLOAD_BYTES:
                     raise HTTPException(413, "文件超过 80 MB 限制。")
                 handle.write(chunk)
-        paragraphs = await asyncio.to_thread(extract_paragraphs, inbox_path)
+        paragraphs = await asyncio.to_thread(
+            extract_paragraphs,
+            inbox_path,
+            bool(auto_ocr) and suffix == ".pdf",
+            pdf_layout.normalize_mode(get_settings().pdf_layout_mode),
+        )
         # Keep one translation segment per Word paragraph/table cell so the
         # translated DOCX can be written back into a copy of the original.
         segment_texts = paragraphs if suffix in {".doc", ".docx"} else split_into_segments(paragraphs)
@@ -92,6 +100,7 @@ async def upload_document(
         "source_language": source,
         "target_language": target,
         "detected_language": detected,
+        "ocr": bool(auto_ocr) and suffix == ".pdf",
         "status": "ready",
         "progress": 0,
         "error": "",

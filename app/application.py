@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routers import documents, system, translation
+from app.api.routers import conversions, documents, system, translation
 from app.core.runtime import active_tasks
 from app.services.storage import STATIC, ensure_directories, finalize_and_clear_document_records
 
@@ -33,9 +33,10 @@ async def lifespan(_: FastAPI):
 
 def create_app() -> FastAPI:
     """Build the HTTP application with all routers and static resources."""
-    application = FastAPI(title="fxxk_file", version="1.6.1", lifespan=lifespan)
+    application = FastAPI(title="fxxk_file", version="1.9.0", lifespan=lifespan)
     application.include_router(system.router)
     application.include_router(documents.router)
     application.include_router(translation.router)
+    application.include_router(conversions.router)
     application.mount("/", StaticFiles(directory=STATIC, html=True), name="static")
     return application

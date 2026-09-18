@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
     branches: [main]
 
@@ -20,16 +20,23 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: python -m pip install -r requirements.txt
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -r requirements-convert.txt
+          python -m pip install pytest
 
       - name: Compile backend
         run: python -m compileall -q app tools
+
+      - name: Run service tests
+        run: python -m pytest tests -q
 
       - name: Check frontend JavaScript syntax
         run: |
           node --check app/static/app.js
           node --check app/static/scripts/features/compare.js
           node --check app/static/scripts/features/images.js
+          node --check app/static/scripts/features/convert.js
           node --check app/static/scripts/features/markdown.js
 
       - name: Check frontend DOM references
@@ -48,6 +55,33 @@ jobs:
           print(f"validated {len(ids)} DOM ids")
           PY
 
+      - name: Check vendored front-end assets
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          vendor = Path("app/static/vendor")
+          required = {
+              "purify.min.js": b"DOMPurify",
+              "diff.min.js": b"diffLines",
+              "markdown-it.min.js": b"markdown-it",
+              "markdown-it-task-lists.min.js": b"markdown-it-task-lists",
+          }
+          for name, marker in required.items():
+              path = vendor / name
+              if not path.is_file():
+                  raise SystemExit(f"missing vendored asset: {name}")
+              if marker not in path.read_bytes():
+                  raise SystemExit(f"{name} does not look like the expected bundle")
+              if not (vendor / name.replace(".min.js", ".LICENSE.txt")).is_file():
+                  raise SystemExit(f"missing license for {name}")
+          index = Path("app/static/index.html").read_text(encoding="utf-8")
+          for name in required:
+              if f"/vendor/{name}" not in index:
+                  raise SystemExit(f"{name} is not referenced by index.html")
+          print(f"validated {len(required)} vendored assets")
+          PY
+
       - name: Import application and inspect routes
         run: |
           python - <<'PY'
@@ -55,11 +89,100 @@ jobs:
 
           assert app.title == "fxxk_file"
           paths = {route.path for route in app.routes if hasattr(route, "path")}
-          required = {"/", "/api/health", "/api/settings", "/api/documents"}
+          required = {
+              "/",
+              "/api/health",
+              "/api/settings",
+              "/api/documents",
+              "/api/documents/{document_id}/convert-script",
+              "/api/documents/{document_id}/cancel",
+              "/api/documents/{document_id}/segments/batch",
+              "/api/convert/capabilities",
+              "/api/convert/text",
+              "/api/convert/tables",
+              "/api/convert/subtitles/convert",
+              "/api/convert/documents/{mode}",
+              "/api/convert/pdf/{mode}",
+              "/api/convert/language",
+          }
           missing = required - paths
           if missing:
               raise SystemExit(f"missing routes: {sorted(missing)}")
           print(f"validated {len(paths)} routes")
+          PY
+
+      - name: Check design tokens are used everywhere
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          # Enforces docs/DESIGN.md §9. Keep this in sync with
+          # .tmp/integration/token-check.py, which runs the same rules locally.
+          STYLES = Path("app/static/styles")
+          TOKENS = STYLES / "tokens.css"
+          MIN_TEXT_PX = 12
+
+          text = TOKENS.read_text(encoding="utf-8")
+          defined = set(re.findall(r"^\s*--([a-z0-9-]+)\s*:", text, re.M))
+          failures = []
+
+          others = {
+              path.name: path.read_text(encoding="utf-8")
+              for path in sorted(STYLES.glob("*.css"))
+              if path.name != "tokens.css"
+          }
+
+          for name, css in others.items():
+              unknown = sorted(set(re.findall(r"var\(--([a-z0-9-]+)\)", css)) - defined)
+              if unknown:
+                  failures.append(f"{name}: undefined tokens {unknown}")
+              colours = sorted(set(re.findall(r"#[0-9a-fA-F]{3,8}\b", css)))
+              colours += sorted(set(re.findall(r"\brgba?\([^)]*\)", css)))
+              if colours:
+                  failures.append(f"{name}: hardcoded colours {colours[:6]}")
+
+          scaled = re.compile(r"(font-size|font-weight|border-radius):\s*([^;]+);")
+          for name, css in others.items():
+              for prop, value in scaled.findall(css):
+                  value = value.strip()
+                  if value.startswith(("var(", "clamp(", "calc(")):
+                      continue
+                  if value.endswith("%") or value == "0":
+                      continue
+                  if prop == "font-size" and value.endswith("em"):
+                      continue
+                  failures.append(f"{name}: {prop}: {value} is not a token/clamp/percentage")
+
+          for token, value in re.findall(r"^\s*--(text-[a-z]+)\s*:\s*([0-9.]+)px", text, re.M):
+              if float(value) < MIN_TEXT_PX:
+                  failures.append(f"tokens.css: --{token} is {value}px, below the {MIN_TEXT_PX}px floor")
+
+          # A component may only reference the semantic alias layer, never a raw
+          # scale step (docs/DESIGN.md §2).
+          for name, css in others.items():
+              raw = sorted(set(re.findall(r"var\(--(static-[a-z0-9-]+)\)", css)))
+              if raw:
+                  failures.append(f"{name}: references a raw scale {raw[:4]} — use a --color-* alias")
+
+          duration = re.compile(r"(?:transition|animation)(?:-duration)?:[^;]*?(\d+\.?\d*(?:ms|s))\b")
+          for name, css in others.items():
+              hits = sorted(set(duration.findall(css)))
+              if hits:
+                  failures.append(f"{name}: literal durations {hits} — use a --motion-* token")
+
+          used = set(re.findall(r"var\(--([a-z0-9-]+)\)", (STYLES / "tokens.css").read_text(encoding="utf-8")))
+          for css in others.values():
+              used |= set(re.findall(r"var\(--([a-z0-9-]+)\)", css))
+          # The static scales are a palette (docs/DESIGN.md §2.1): a step may
+          # exist before a component picks it up. Every alias must be consumed.
+          unused = sorted(t for t in defined - used if not t.startswith("static-") and t != "md-scale")
+          if unused:
+              failures.append(f"tokens.css: defined but never used {unused}")
+
+          if failures:
+              raise SystemExit("design check failed:\n  - " + "\n  - ".join(failures))
+          print(f"validated {len(defined)} design tokens, {MIN_TEXT_PX}px type floor")
           PY
 
       - name: Check whitespace

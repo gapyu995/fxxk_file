@@ -7,7 +7,10 @@ from fastapi.responses import FileResponse
 
 from app.api.schemas import SettingsUpdate
 from app.config import get_settings, save_translation_settings
+from app.services.ocr import available as ocr_available
+from app.services.pdf_layout import available as pdf_layout_available
 from app.services.storage import STATIC
+from app.services.text_normalize import available as zhconv_available
 
 router = APIRouter()
 
@@ -38,6 +41,10 @@ async def read_settings() -> dict:
         "batch_size": settings.batch_size,
         "request_char_limit": settings.request_char_limit,
         "max_retries": settings.max_retries,
+        "zh_script_mode": settings.zh_script_mode,
+        "zh_script_available": zhconv_available(),
+        "ocr_available": ocr_available(),
+        "pdf_layout_available": pdf_layout_available(),
     }
 
 
@@ -56,6 +63,7 @@ async def update_settings(body: SettingsUpdate) -> dict:
         body.batch_size,
         body.request_char_limit,
         body.max_retries,
+        body.zh_script_mode,
     )
     updated = get_settings()
     return {"configured": updated.translation_configured, "has_api_key": bool(updated.api_key)}
